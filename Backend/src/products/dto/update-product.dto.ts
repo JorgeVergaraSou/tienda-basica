@@ -1,5 +1,6 @@
 import { Transform } from 'class-transformer';
 import {
+  IsBoolean,
   IsInt,
   IsNumber,
   IsOptional,
@@ -32,6 +33,14 @@ export class UpdateProductDto {
   @IsInt({ message: 'El stock debe ser un número entero' })
   @Min(0, { message: 'El stock no puede ser negativo' })
   stock?: number;
+
+  /** ver el mismo campo en CreateProductDto. Este PATCH sigue siendo
+   * ADMIN-only (ver ProductsController) — para que un USER pueda tocar
+   * solo este campo en un producto propio existe el endpoint dedicado
+   * PATCH /:id/visibilidad-stock (ver UpdateStockVisibilityDto). */
+  @IsOptional()
+  @IsBoolean({ message: 'mostrarStock debe ser un valor booleano' })
+  mostrarStock?: boolean;
 
   /** ver el mismo campo en CreateProductDto */
   @IsOptional()

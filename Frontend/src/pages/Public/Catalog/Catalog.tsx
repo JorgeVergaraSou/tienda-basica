@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { getCategoriesService, getProductsService } from '@/services';
 import { Category, Product } from '@/interfaces';
 import { getErrorMessage, apiOrigin } from '@/utilities';
 import { Button } from '@/components/ui';
 import { InputBuscarProductos } from '@/components/ProductSearch/InputBuscarProductos';
+import { ProductDetailModal } from './ProductDetailModal';
 
 const PAGE_SIZE = 12;
 
@@ -25,6 +25,9 @@ function Catalog() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  // null = modal cerrado. Guarda el Product completo (no solo el id) para
+  // no tener que volver a pedirlo — ver ProductDetailModal.tsx.
+  const [productoSeleccionado, setProductoSeleccionado] = useState<Product | null>(null);
 
   // categorías para el filtro — se cargan una sola vez
   useEffect(() => {
@@ -131,17 +134,21 @@ function Catalog() {
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
         {products.map((product) => (
-          <Link
+          <button
             key={product.idProducto}
-            to={`/productos/${product.idProducto}`}
-            className="border border-gray-200 rounded-md overflow-hidden flex flex-col hover:shadow-md transition-shadow"
+            type="button"
+            onClick={() => setProductoSeleccionado(product)}
+            className="border border-gray-200 rounded-md overflow-hidden flex flex-col hover:shadow-md transition-shadow text-left cursor-pointer"
           >
             <div className="h-40 bg-gray-100 flex items-center justify-center">
               {product.imageUrl ? (
+                // object-contain (no object-cover, mismo criterio que
+                // ProductDetailModal.tsx): se ve la imagen completa sin
+                // recortarla para llenar la caja a la fuerza.
                 <img
                   src={`${apiOrigin}${product.imageUrl}`}
                   alt={product.nombre}
-                  className="h-full w-full object-cover"
+                  className="h-full w-full object-contain"
                 />
               ) : (
                 <span className="text-gray-400 text-sm">Sin imagen</span>
@@ -153,13 +160,25 @@ function Catalog() {
                 <span className="text-xs text-gray-500">{product.categoria.nombre}</span>
               )}
               <p className="mt-auto font-semibold">{formatPrice(product.precio)}</p>
-              {product.stock === 0 && (
-                <span className="text-xs text-red-600">Sin stock</span>
+              {/* stock === null: el dueño eligió no mostrarlo (ver
+                  Product.mostrarStock) — no es lo mismo que stock === 0
+                  (sin stock real). */}
+              {product.stock === null ? (
+                <span className="text-xs text-gray-500">Consultar disponibilidad</span>
+              ) : (
+                product.stock === 0 && (
+                  <span className="text-xs text-red-600">Sin stock</span>
+                )
               )}
             </div>
-          </Link>
+          </button>
         ))}
       </div>
+
+      <ProductDetailModal
+        product={productoSeleccionado}
+        onClose={() => setProductoSeleccionado(null)}
+      />
 
       {totalPages > 1 && (
         <div className="flex justify-center items-center gap-4 mt-6">

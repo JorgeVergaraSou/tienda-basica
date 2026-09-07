@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { AdminUpdateUserDto } from './dto/admin-update-user.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UserEntity } from './entities/user.entity';
@@ -312,6 +313,92 @@ export class UsersService {
     }
   }
 
+  /** ADMIN edita a CUALQUIER usuario — a diferencia de updateUser
+   * (autoservicio, solo tu propia cuenta, exige `currentPassword`), acá no
+   * hace falta la contraseña actual del usuario editado (el ADMIN no la
+   * conoce). Permite además cambiar `role` y setear una `password` nueva
+   * directamente (recuperación de cuenta). Bloquea sacarle el rol ADMIN al
+   * único administrador activo que queda — ver esUnicoAdminActivo. */
+  async actualizarUsuarioAdmin(
+    id: number,
+    dto: AdminUpdateUserDto,
+  ): Promise<void> {
+    try {
+      const fieldsUpdated: string[] = [];
+      const userData = await this.getUserWithDeleted(id); // lanza NotFoundException si no existe
+
+      const updateData: Partial<UserEntity> = {};
+
+      if (dto.nickUsuario && dto.nickUsuario !== userData.nickUsuario) {
+        const existeNick = await this.findOneByNick(dto.nickUsuario);
+
+        if (existeNick) {
+          throw new BadRequestException('El nombre de usuario ya está en uso');
+        }
+
+        updateData.nickUsuario = dto.nickUsuario;
+        fieldsUpdated.push('nickUsuario');
+      }
+
+      if (dto.email && dto.email !== userData.email) {
+        const existeEmail = await this.findOneByEmail(dto.email);
+
+        if (existeEmail) {
+          throw new BadRequestException('Ya se encuentra en uso este E-mail');
+        }
+
+        updateData.email = dto.email;
+        fieldsUpdated.push('email');
+      }
+
+      if (dto.nombre && dto.nombre !== userData.nombre) {
+        updateData.nombre = dto.nombre;
+        fieldsUpdated.push('nombre');
+      }
+
+      if (dto.apellido && dto.apellido !== userData.apellido) {
+        updateData.apellido = dto.apellido;
+        fieldsUpdated.push('apellido');
+      }
+
+      if (dto.role && dto.role !== userData.role) {
+        if (userData.role === Role.ADMIN && (await this.esUnicoAdminActivo())) {
+          throw new BadRequestException(
+            'No podés quitarle el rol de administrador al único administrador activo',
+          );
+        }
+
+        updateData.role = dto.role;
+        fieldsUpdated.push('role');
+      }
+
+      if (dto.password) {
+        updateData.password = await argon2.hash(dto.password);
+        fieldsUpdated.push('password');
+      }
+
+      if (fieldsUpdated.length === 0) {
+        return;
+      }
+
+      await this.userRepository.update(id, updateData);
+
+      // igual que en updateUser: solo se loguean los nombres de los campos
+      // tocados, nunca sus valores.
+      updateLogger.info(
+        `Usuario actualizado por ADMIN (ID ${id}): campos ${JSON.stringify(fieldsUpdated)}`,
+      );
+    } catch (error) {
+      handleServiceError(
+        error,
+        usersErrorLogger,
+        'UsersService.actualizarUsuarioAdmin',
+        'Ocurrió un error al actualizar el usuario',
+        { id },
+      );
+    }
+  }
+
   /** asocia un email al usuario. Se usa la primera vez que pide recuperar
    * su clave y todavía no tiene email guardado (ver
    * AuthService.requestResetPassword). */
@@ -404,6 +491,12 @@ export class UsersService {
         throw new BadRequestException('El usuario ya está inactivo');
       }
 
+      if (user.role === Role.ADMIN && (await this.esUnicoAdminActivo())) {
+        throw new BadRequestException(
+          'No podés dar de baja al único administrador activo',
+        );
+      }
+
       await this.userRepository.softDelete(id);
       deleteLogger.info(`Usuario dado de baja (ID ${id}, soft-delete)`);
     } catch (error) {
@@ -439,6 +532,21 @@ export class UsersService {
         { id },
       );
     }
+  }
+
+  /** true si hay como mucho un ADMIN activo en toda la tabla — usado antes
+   * de dar de baja o sacarle el rol ADMIN a alguien, para no terminar sin
+   * nadie que pueda administrar la app. `.count()` sin `withDeleted:true`
+   * ya excluye por default los usuarios dados de baja (soft-delete), así
+   * que esto cuenta ADMINs realmente activos. Se llama solo cuando el
+   * usuario en cuestión YA es ADMIN activo — si el conteo da <= 1 en ese
+   * momento, ese usuario tiene que ser el único. */
+  private async esUnicoAdminActivo(): Promise<boolean> {
+    const totalAdminsActivos = await this.userRepository.count({
+      where: { role: Role.ADMIN },
+    });
+
+    return totalAdminsActivos <= 1;
   }
 
   // Helper para obtener el usuario, incluyendo los borrados

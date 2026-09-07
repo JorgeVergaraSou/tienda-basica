@@ -1,6 +1,7 @@
 export const PublicRoutes = {
     LOGIN: 'login',
     REGISTER: 'register',
+    SERVICE_UNAVAILABLE: 'servicio-no-disponible',
 }
 
 export const PrivateRoutes = {

@@ -26,6 +26,7 @@ import { UserActiveInterface } from '@/common/interfaces/user-active.interface';
 import { RequestResetPasswordDto } from './dto/requestResetPassword.dto';
 import { ResetPasswordDto } from './dto/resetPassword.dto';
 import { UpdateUserDto } from '@/users/dto/update-user.dto';
+import { AdminUpdateUserDto } from '@/users/dto/admin-update-user.dto';
 import {
   avatarStorage,
   avatarFileFilter,
@@ -111,6 +112,20 @@ export class AuthController {
   @Auth(Role.ADMIN)
   async findAllUsers() {
     return await this.authService.findAll();
+  }
+
+  /** ADMIN edita a cualquier usuario (nickUsuario/nombre/apellido/email/
+   * role/password) — distinto de PATCH /updateUser/:id, que es
+   * autoservicio (solo tu propia cuenta, exige tu contraseña actual). Acá
+   * no se pide contraseña: el ADMIN ya está autenticado por su propio JWT,
+   * y no tiene por qué conocer la del usuario que edita. */
+  @Patch('editar-usuario/:id')
+  @Auth(Role.ADMIN)
+  async editarUsuario(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: AdminUpdateUserDto,
+  ): Promise<void> {
+    return this.authService.editarUsuarioAdmin(id, dto);
   }
 
   @Delete('dar-de-baja-usuario/:id')

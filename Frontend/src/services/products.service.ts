@@ -14,6 +14,9 @@ export interface ProductFormData {
   descripcion?: string;
   precio: number;
   stock?: number;
+  // si se omite, el backend aplica su default (true, stock visible) — ver
+  // Product.mostrarStock.
+  mostrarStock?: boolean;
   // id de una categoría existente, o null para "sin categoría" (ver
   // CategoriesService en el backend)
   idCategoria?: number | null;
@@ -100,6 +103,20 @@ export const activateProductService = async (idProducto: number): Promise<void> 
   await api.patch(`/productos/${idProducto}/activar`);
 };
 
+/** endpoint dedicado (no el PATCH general de updateProductService, que
+ * requiere ADMIN) — así USER también puede tocar esto en un producto
+ * propio. Ver ProductsController.actualizarVisibilidadStock en el
+ * backend. */
+export const updateStockVisibilityService = async (
+  idProducto: number,
+  mostrarStock: boolean,
+): Promise<Product> => {
+
+  const res = await api.patch(`/productos/${idProducto}/visibilidad-stock`, { mostrarStock });
+
+  return res.data;
+};
+
 export const uploadProductImageService = async (
   idProducto: number,
   file: File,
@@ -111,6 +128,38 @@ export const uploadProductImageService = async (
   const res = await api.post(`/productos/${idProducto}/imagen`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
+
+  return res.data;
+};
+
+/** agrega una foto a la galería del producto (se suma a las que ya tiene,
+ * no reemplaza la portada ni las demás fotos) — ver
+ * ProductsController.agregarFoto en el backend. Para subir varias, llamar
+ * una vez por archivo (mismo criterio que el backend: un archivo por
+ * request, ver product-image-upload.config.ts). */
+export const addProductPhotoService = async (
+  idProducto: number,
+  file: File,
+): Promise<Product> => {
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const res = await api.post(`/productos/${idProducto}/fotos`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+
+  return res.data;
+};
+
+/** elimina una foto puntual de la galería (por su ID, no borra todas) —
+ * ver ProductsController.eliminarFoto en el backend. */
+export const deleteProductPhotoService = async (
+  idProducto: number,
+  idFoto: number,
+): Promise<Product> => {
+
+  const res = await api.delete(`/productos/${idProducto}/fotos/${idFoto}`);
 
   return res.data;
 };

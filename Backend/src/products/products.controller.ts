@@ -24,6 +24,7 @@ import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { FindProductsQueryDto } from './dto/find-products-query.dto';
+import { UpdateStockVisibilityDto } from './dto/update-stock-visibility.dto';
 
 @Controller('productos')
 export class ProductsController {
@@ -116,6 +117,39 @@ export class ProductsController {
     return this.productsService.actualizarImagen(id, file, user);
   }
 
+  /** agrega una foto a la galería del producto (se suma a las que ya
+   * tiene, no reemplaza nada — a diferencia de POST /:id/imagen que sí
+   * reemplaza la portada). Mismo criterio de permisos que actualizarImagen:
+   * USER solo en productos que él mismo cargó, chequeado en el service. */
+  @Auth(Role.ADMIN, Role.USER)
+  @Post(':id/fotos')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: productImageStorage,
+      fileFilter: productImageFileFilter,
+      limits: { fileSize: 5 * 1024 * 1024 },
+    }),
+  )
+  async agregarFoto(
+    @Param('id', ParseIntPipe) id: number,
+    @UploadedFile() file: Express.Multer.File,
+    @ActiveUser() user: UserActiveInterface,
+  ) {
+    return this.productsService.agregarFoto(id, file, user);
+  }
+
+  /** elimina una foto puntual de la galería (por su ID, no borra todas) —
+   * mismo criterio de permisos que agregarFoto/actualizarImagen. */
+  @Auth(Role.ADMIN, Role.USER)
+  @Delete(':id/fotos/:idFoto')
+  async eliminarFoto(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('idFoto', ParseIntPipe) idFoto: number,
+    @ActiveUser() user: UserActiveInterface,
+  ) {
+    return this.productsService.eliminarFoto(id, idFoto, user);
+  }
+
   @Auth(Role.ADMIN)
   @Delete(':id')
   async darDeBaja(@Param('id', ParseIntPipe) id: number): Promise<void> {
@@ -132,5 +166,22 @@ export class ProductsController {
     @ActiveUser() user: UserActiveInterface,
   ): Promise<void> {
     return this.productsService.activarProducto(id, user);
+  }
+
+  /** endpoint dedicado (no el PATCH general, que sigue ADMIN-only) para
+   * que USER pueda tocar solo este campo en un producto propio — mismo
+   * criterio de ownership que actualizarImagen/activar/agregarFoto. */
+  @Auth(Role.ADMIN, Role.USER)
+  @Patch(':id/visibilidad-stock')
+  async actualizarVisibilidadStock(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateStockVisibilityDto,
+    @ActiveUser() user: UserActiveInterface,
+  ) {
+    return this.productsService.actualizarVisibilidadStock(
+      id,
+      dto.mostrarStock,
+      user,
+    );
   }
 }

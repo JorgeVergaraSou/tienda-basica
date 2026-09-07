@@ -4,6 +4,7 @@ import RoutesWithNotFound from '@/utilities/RoutesWithNotFound.utility';
 import ProductsListPage from './Products/ProductsListPage';
 import ProductFormPage from './Products/ProductFormPage';
 import CategoriesPage from './Categories/CategoriesPage';
+import UsersPage from './Users/UsersPage';
 
 const tabClass = ({ isActive }: { isActive: boolean }) =>
   `px-3 py-2 rounded-md text-sm font-medium border-b-2 transition-colors ${
@@ -19,6 +20,9 @@ const tabClass = ({ isActive }: { isActive: boolean }) =>
  * - /admin/productos/nuevo  crear (ProductFormPage, sin :id)
  * - /admin/productos/:id/editar  editar (ProductFormPage, con :id)
  * - /admin/categorias       gestión de categorías (CategoriesPage)
+ * - /admin/usuarios         gestión de usuarios (UsersPage) — crear/editar
+ *   en un modal (UserFormModal) en vez de una página aparte, no una ruta
+ *   propia como los productos.
  */
 function Admin() {
   return (
@@ -35,6 +39,9 @@ function Admin() {
         <NavLink to={`/${PrivateRoutes.ADMIN}/categorias`} className={tabClass}>
           Categorías
         </NavLink>
+        <NavLink to={`/${PrivateRoutes.ADMIN}/usuarios`} className={tabClass}>
+          Usuarios
+        </NavLink>
       </nav>
 
       <RoutesWithNotFound>
@@ -43,6 +50,7 @@ function Admin() {
         <Route path="productos/nuevo" element={<ProductFormPage />} />
         <Route path="productos/:id/editar" element={<ProductFormPage />} />
         <Route path="categorias" element={<CategoriesPage />} />
+        <Route path="usuarios" element={<UsersPage />} />
       </RoutesWithNotFound>
     </div>
   );

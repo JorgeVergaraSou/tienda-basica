@@ -180,6 +180,133 @@ buscador en vivo):
     `ProductsService.activarProducto` (mismo patrón que `actualizarImagen`) — ver CLAUDE.md del
     backend. Editar y dar de baja siguen siendo ADMIN-only, sin cambios.
 
+**Detalle de producto en modal** (pedido explícito del usuario, después de que el backend ganó
+galería de fotos — ver CLAUDE.md del backend, sección "Galería de fotos"): clickear una tarjeta de
+`Catalog.tsx` ya **no navega** a `productos/:id` — abre `ProductDetailModal.tsx` (nuevo, en
+`pages/Public/Catalog/`) con el `Product` que el catálogo ya tenía en memoria (la lista de
+`GET /productos` ya trae `descripcion`/`imageUrl`/`fotos` completos), sin repetir ningún fetch.
+`pages/Public/ProductDetail/ProductDetail.tsx` y su ruta **no se tocaron ni se borraron** —
+quedaron sin enlazar desde la UI, igual que `Register.tsx`, para que una URL directa
+`/productos/:id` (bookmark, link compartido) siga funcionando; se confirmó primero que ningún otro
+lugar del frontend armaba un link a esa ruta.
+- `components/ui/Modal.tsx`, nuevo — modal genérico sobre `@headlessui/react` (`Dialog` +
+  `DialogBackdrop` + `DialogPanel`; era dependencia del proyecto desde el arranque de la
+  plantilla, sin usarse en ningún componente hasta ahora). Resuelve ESC/click afuera/foco atrapado
+  sin reimplementarlo a mano; no impone contenido, cualquier página nueva que necesite un modal
+  puede reusarlo.
+- `ProductDetailModal.tsx`: galería simple de **miniaturas + foto grande seleccionada** (no
+  carrusel — más simple de implementar bien para un catálogo, sin gestos de swipe que mantener).
+  Muestra como "las fotos" la unión de `product.imageUrl` (portada, primera) + `product.fotos[]`
+  (galería), armada en el propio componente sin tocar el backend. La descripción va en un bloque
+  con su propio `max-h-40 overflow-y-auto` — scroll interno, no estira el modal ni corta texto sin
+  forma de verlo. El índice de la miniatura seleccionada se resetea al cambiar de producto
+  ajustando el estado durante el render (comparando contra el `idProducto` anterior guardado en
+  estado), no con un `useEffect` — la regla `react-hooks/set-state-in-effect` del linter no deja
+  llamar a `setState` síncrono dentro de un efecto.
+- `interfaces/product.interface.ts` ganó `ProductImage` (`{ idProductoImagen, imageUrl }`) y
+  `Product.fotos: ProductImage[]` (siempre array, nunca `undefined`) — reflejaba la forma vieja del
+  backend, sin el array de galería.
+
+**Visibilidad del stock** (pedido explícito del usuario, después del backend agregar
+`ProductEntity.mostrarStock`): ADMIN (en `ProductFormPage.tsx`, crear y editar) y USER (en
+`CargarProductoPage.tsx` al crear, y en `MisProductosPage.tsx` para tocarlo después — es la única
+vista de USER que no es un form, así que ahí el check llama directo a
+`updateStockVisibilityService`, nuevo en `products.service.ts`, `PATCH /:id/visibilidad-stock`)
+tienen un checkbox "Mostrar stock a los clientes". `Product.stock` pasó de `number` a
+`number | null`: **null solo en las vistas públicas** (`Catalog.tsx`, `ProductDetailModal.tsx`)
+cuando el dueño lo ocultó — ahí se muestra "Consultar disponibilidad" en vez del número (no
+confundir con `stock === 0`, que sigue siendo "Sin stock"). Las vistas privilegiadas
+(`ProductsListPage.tsx`, `MisProductosPage.tsx`, los forms) nunca reciben `null` en la práctica —
+usan `product.stock ?? 0` solo para satisfacer el tipo compartido con las vistas públicas.
+
+**Subir varias fotos desde el form** (pedido explícito del usuario: el backend ya soportaba
+galería desde antes — `POST /:id/fotos`, `DELETE /:id/fotos/:idFoto` — pero ningún form la usaba
+todavía). Campo nuevo "Fotos adicionales" (`<input type="file" multiple>`) separado del campo
+"Imagen (portada)" existente — a propósito dos campos distintos en vez de uno solo con
+`multiple` (que el primer archivo se vuelva portada automáticamente sería más "mágico" y menos
+obvio que replicar el mismo criterio portada/galería que ya tiene el backend). Los archivos
+elegidos se guardan en estado (`photoFiles: File[]`) y se suben recién al guardar el form, una
+request por archivo, secuencial (`addProductPhotoService`/`deleteProductPhotoService`, nuevos en
+`products.service.ts`):
+- `CargarProductoPage.tsx` (USER, solo crear): sube portada + fotos adicionales después de crear
+  el producto, mismo momento que ya subía la portada.
+- `ProductFormPage.tsx` (ADMIN, crear y editar): mismo campo de fotos nuevas + en modo edición
+  además muestra la galería que el producto ya tiene (`product.fotos`, cargada junto con el resto
+  del form) con un botón "×" por foto para borrarla — acción inmediata (no espera al submit del
+  form), mismo criterio que "Reactivar"/"Dar de baja" en las otras páginas del panel.
+- El preview de la portada actual (`currentImageUrl`) pasó de `object-cover` a `object-contain`
+  de paso, mismo motivo que `Catalog.tsx`/`ProductDetailModal.tsx` (ver más arriba, sección
+  "Detalle de producto en modal").
+
+**Perfil rediseñado** (pedido explícito del usuario: "replicá lo del perfil de mi otro proyecto" —
+`FRONTENDS/siscofar-frontend/src/pages/Private/Profile.tsx`, sin relación de código entre ambos
+proyectos, solo se portó el diseño/comportamiento). El `Profile.tsx` viejo (sin estilar, un campo
+fijo de "contraseña actual" reusado para cualquier cambio) se reemplazó por:
+- Avatar circular con iniciales de fallback (`getIniciales`) + botón "✎" superpuesto que abre un
+  `<input type="file">` oculto — sube con `actualizarFotoService` (nuevo en `auth.service.ts`,
+  `POST /auth/foto`, mismo mecanismo multipart que `uploadProductImageService`). El backend ya
+  tenía este endpoint (`AuthController.actualizarFoto`) y `User.fotoUrl` en la interfaz — el
+  frontend nunca los usaba.
+- `components/Profile/ProfileField.tsx`, nuevo — un campo por fila, en reposo muestra el valor +
+  link "Editar"; al click abre input + Guardar/Cancelar. Puerto del componente homónimo del otro
+  proyecto, con sus clases custom (`field-input`/`btn-primary`/`btn-secondary`, CSS que ese
+  proyecto tiene y este no) cambiadas por utilidades de Tailwind directas y el `Button` de
+  `components/ui` que ya existía acá.
+- Confirmación con contraseña **por cada campo**, vía un prompt de SweetAlert2 en el momento de
+  guardar (no un campo fijo al pie reusado para todo): `PATCH /auth/updateUser/:id` ya exigía
+  `currentPassword` en cada llamada (`UsersService.updateUser`, 400 si falta o es incorrecta) — el
+  frontend viejo lo pedía una sola vez y listo, sin repetir la confirmación en cada guardado.
+- Si el campo actualizado es `nickUsuario` o `email` (los dos identificadores de cuenta — ver
+  "Identidad de login" en `Backend/CLAUDE.md`), se cierra la sesión y se manda a `/login` después
+  de avisar con un Swal — a mano (`dispatch(resetUser())` + `navigate`), **no** con el hook
+  `useLogout()` que ya tiene este proyecto: ese hook siempre pide confirmación con otro Swal
+  ("¿Querés cerrar la sesión?"), inapropiado acá porque no es una decisión del usuario, es
+  consecuencia obligada de haber cambiado su propio identificador de login.
+- Roles del badge adaptados a los reales de este proyecto (`ADMIN`/`USER`/`GUEST`) — el original
+  tenía un cuarto rol (`SOLICITANTE`) que acá no existe. Campos `nombre`/`apellido` (no
+  `name`/`surname` del original) — misma diferencia que ya documentaba "Conexión al backend real"
+  más arriba.
+
+**CRUD de usuarios para ADMIN** (pedido explícito del usuario: "creame un CRUD para dar de alta
+usuarios, solo el admin puede tener acceso"). Nueva pestaña `pages/Private/Admin/Users/`, cuarta
+del panel (junto a Productos/Categorías), montada en `admin/usuarios` — protegida igual que el
+resto de `Admin.tsx` (`RoleGuard` de `App.tsx`, ADMIN exclusivo):
+- `UsersPage.tsx` — listado (`GET /auth/listar-usuarios`, nuevo `getUsersService` en
+  `services/users.service.ts`) + "Dar de baja"/"Reactivar" por fila, mismo patrón que
+  `CategoriesPage.tsx`/`ProductsListPage.tsx` (Swal de confirmación, `reloadToken` para refrescar).
+- `UserFormModal.tsx` — crear y editar en el mismo modal (reutiliza `components/ui/Modal.tsx`),
+  diferenciado por si le pasan un `UserListItem` (editar, precarga el form) o `null` (crear, form
+  vacío). El índice/estado que arranca el form de nuevo al abrir se resetea comparando el `open`
+  anterior contra el actual y ajustando el estado durante el render (mismo patrón que
+  `ProductDetailModal.tsx` — ver "Detalle de producto en modal" — para no pisar
+  `react-hooks/set-state-in-effect`), no con un `useEffect`.
+- **Editar es la pieza que faltaba en el backend**: `POST /auth/nuevo-usuario` (crear),
+  `GET /auth/listar-usuarios` (listar) y dar de baja/reactivar ya existían — pero no había ningún
+  endpoint para que un ADMIN editara los datos de OTRO usuario (el único que editaba,
+  `PATCH /auth/updateUser/:id`, es autoservicio: solo tu propia cuenta, pide tu contraseña actual).
+  Se agregó `PATCH /auth/editar-usuario/:id` en el backend — ver `Backend/CLAUDE.md`, sección "CRUD
+  de usuarios para ADMIN". Nuevo `updateUserAdminService` en `services/users.service.ts`, **no**
+  reutiliza `updateUserService` de `profile.service.ts` (ese pega a la ruta de autoservicio, con
+  otra semántica de permisos).
+- El form de `UserFormModal.tsx` deja setear una contraseña nueva sin pedir la actual (a diferencia
+  de `ProfileField` en `Profile.tsx`) — es una acción administrativa (recuperar acceso), no
+  autoservicio; en blanco al editar = no se toca la contraseña existente.
+- El backend puede devolver 400 "no podés dar de baja/quitarle el rol de administrador al único
+  administrador activo" (protección nueva, ver `Backend/CLAUDE.md`) — el frontend no hace nada
+  especial con ese caso, llega como cualquier otro error a `showError(getErrorMessage(error))`.
+
+**Paginado en el listado de ADMIN** (pedido explícito del usuario: la tabla de
+`ProductsListPage.tsx` pedía hasta 50 productos de una sola vez sin paginar — "con el tiempo se va
+a llenar y va a ser imposible de controlar"). Se evaluaron dos opciones — paginado por letra inicial
+vs. paginado por cantidad — y se eligió **por cantidad** (`PAGE_SIZE = 30`): agrupar por letra no
+acota nada de verdad (una letra con cientos de productos seguiría siendo una lista larga que
+también habría que paginar), y ya existía el buscador en vivo (`InputBuscarProductos`) para
+encontrar un producto puntual por nombre. Mismo patrón que ya usaba `Catalog.tsx` (estado
+`page`/`total`, botones Anterior/Siguiente, `Math.ceil(total / PAGE_SIZE)`) — no hizo falta tocar el
+backend, `GET /productos/admin/listado` ya aceptaba `page`/`limit` (máximo 50, ver
+`FindProductsQueryDto`). El buscador resetea `page` a 1 al escribir una búsqueda nueva, para no
+quedar en una página que ya no existe con los resultados filtrados.
+
 ## Arquitectura (esto sí hay que mantener con cuidado)
 
 ### Alias `@/`
@@ -200,10 +327,22 @@ de `axios` importado directo:
 - Interceptor de **response**:
   - `401` → limpia `localStorage` y redirige a `/login`.
   - Sin respuesta del servidor (caído / sin red / `ERR_CONNECTION_REFUSED`)
-    → limpia sesión, muestra `servidorNoDisponibleAlert()` y redirige a
-    `/login`. Usa una bandera de módulo (`avisandoServidorCaido`) para no
-    disparar la alerta varias veces si hay varios requests en paralelo
-    fallando a la vez.
+    → limpia sesión igual que en un 401, pero **redirige a
+    `/servicio-no-disponible`, no a `/login`** (bug corregido, pedido explícito
+    del usuario): un visitante anónimo navegando el catálogo público nunca tuvo
+    sesión, y mandarlo a un login que tampoco va a poder autenticar (el
+    servidor sigue caído) no tenía sentido. `pages/Public/ServiceUnavailable/`
+    es una página nueva, pública, que a propósito no le pega a la API al
+    montarse (si lo hiciera, aterrizar ahí con el servidor todavía caído
+    dispararía el mismo error de nuevo) — solo un mensaje + botón "Volver al
+    catálogo". Usa una bandera de módulo (`redirigiendoPorServidorCaido`) para
+    no disparar varias redirecciones si hay varios requests en paralelo
+    fallando a la vez; como el redirect es un `window.location.href` (recarga
+    dura), el módulo se reinstancia solo en la página nueva, así que no hace
+    falta resetear la bandera a mano. `servidorNoDisponibleAlert()` (el
+    `SweetAlert2` que se mostraba antes de redirigir) se sacó de
+    `session-alerts.utils.ts` — quedaba redundante con la página nueva, y su
+    texto ("vas a ser redirigido al login") ya no era cierto.
   - Cualquier otro error se normaliza a `new Error(mensaje)` (tomado de
     `error.response?.data?.message`), así el `catch` del consumidor nunca
     necesita leer `error.response.data.message` a mano.
@@ -310,13 +449,21 @@ src/
 │  ├─ Register/                        (SIN USAR — no hay signup público en el backend, ver
 │  │                                     "Historia reciente"; ruta sacada de App.tsx)
 │  ├─ Public/
-│  │  ├─ Catalog/                      (catálogo público — home del sitio, montada en '/')
-│  │  └─ ProductDetail/                (detalle público de un producto, montada en 'productos/:id')
+│  │  ├─ Catalog/                      (catálogo público — home del sitio, montada en '/'; el
+│  │  │                                 detalle de un producto se abre en ProductDetailModal.tsx,
+│  │  │                                 no navega)
+│  │  ├─ ProductDetail/                (detalle público de un producto por URL directa, montada en
+│  │  │                                 'productos/:id' — sin enlazar desde la UI, ver "Historia
+│  │  │                                 reciente")
+│  │  └─ ServiceUnavailable/           (destino del interceptor de axios cuando el servidor no
+│  │                                    responde, montada en 'servicio-no-disponible' — ver
+│  │                                    "Cliente HTTP centralizado" más abajo)
 │  └─ Private/
 │     ├─ Admin/Admin.tsx               (layout + tabs + sub-ruteo, solo ADMIN — ver Admin/Products/,
-│     │                                 Admin/Categories/, y "Historia reciente")
+│     │                                 Admin/Categories/, Admin/Users/, y "Historia reciente")
 │     ├─ Admin/Products/                (ProductsListPage, ProductFormPage [crear y editar])
 │     ├─ Admin/Categories/              (CategoriesPage)
+│     ├─ Admin/Users/                   (UsersPage, UserFormModal [crear y editar, en un modal])
 │     ├─ User/User.tsx                 (layout + tabs + sub-ruteo, solo USER — ver
 │     │                                 User/CargarProducto/, User/MisProductos/, y "Historia
 │     │                                 reciente")

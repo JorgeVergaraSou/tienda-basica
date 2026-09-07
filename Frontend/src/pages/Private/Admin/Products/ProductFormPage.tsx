@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
+  addProductPhotoService,
   createProductService,
+  deleteProductPhotoService,
   getAdminCategoriesService,
   getAdminProductService,
   updateProductService,
   uploadProductImageService,
 } from '@/services';
-import { Category, Product } from '@/interfaces';
+import { Category, Product, ProductImage } from '@/interfaces';
 import { PrivateRoutes } from '@/models';
 import { getErrorMessage, apiOrigin } from '@/utilities';
 import { showSuccess } from '@/utilities/alerts/alert.utils';
@@ -18,6 +20,9 @@ interface ProductFormState {
   descripcion: string;
   precio: string;
   stock: string;
+  // controla si el número de stock se muestra a los clientes en el
+  // catálogo público — ver Product.mostrarStock.
+  mostrarStock: boolean;
   // '' = sin categoría; si no, es el idCategoria como string (viene de un
   // <select>, que solo maneja valores string).
   idCategoria: string;
@@ -28,6 +33,7 @@ const emptyForm: ProductFormState = {
   descripcion: '',
   precio: '',
   stock: '',
+  mostrarStock: true,
   idCategoria: '',
 };
 
@@ -46,6 +52,14 @@ function ProductFormPage() {
   const [form, setForm] = useState<ProductFormState>(emptyForm);
   const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
+  // galería que el producto ya tiene (solo aplica editando — al crear
+  // todavía no existe el producto, así que arranca vacía) + los archivos
+  // nuevos elegidos pero sin subir todavía, se suben recién al guardar
+  // (mismo momento que la portada). Ver agregarFoto/eliminarFoto en el
+  // backend.
+  const [currentFotos, setCurrentFotos] = useState<ProductImage[]>([]);
+  const [photoFiles, setPhotoFiles] = useState<File[]>([]);
+  const [deletingFotoId, setDeletingFotoId] = useState<number | null>(null);
   const [loading, setLoading] = useState(Boolean(editingId));
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -89,10 +103,15 @@ function ProductFormPage() {
           nombre: product.nombre,
           descripcion: product.descripcion ?? '',
           precio: String(product.precio),
-          stock: String(product.stock),
+          // esta página siempre lee GET /productos/admin/:id, que nunca
+          // oculta el stock (ver Product.mostrarStock) — ?? '' es solo
+          // para satisfacer el tipo number | null.
+          stock: String(product.stock ?? ''),
+          mostrarStock: product.mostrarStock,
           idCategoria: product.categoria ? String(product.categoria.idCategoria) : '',
         });
         setCurrentImageUrl(product.imageUrl);
+        setCurrentFotos(product.fotos);
       } catch (error) {
         if (!cancelado) setFormError(getErrorMessage(error));
       } finally {
@@ -124,6 +143,7 @@ function ProductFormPage() {
       descripcion: form.descripcion.trim() || undefined,
       precio,
       stock: form.stock.trim() ? Number(form.stock) : undefined,
+      mostrarStock: form.mostrarStock,
       idCategoria: form.idCategoria ? Number(form.idCategoria) : null,
     };
 
@@ -143,12 +163,40 @@ function ProductFormPage() {
         await uploadProductImageService(product.idProducto, imageFile);
       }
 
+      // una request por archivo (mismo criterio que el backend — ver
+      // agregarFoto/product-image-upload.config.ts), secuencial para no
+      // saturar la subida con varias en paralelo.
+      for (const file of photoFiles) {
+        await addProductPhotoService(product.idProducto, file);
+      }
+
       await showSuccess(editingId ? 'Producto actualizado' : 'Producto creado');
       navigate(`/${PrivateRoutes.ADMIN}/productos`);
     } catch (error) {
       setFormError(getErrorMessage(error));
     } finally {
       setSaving(false);
+    }
+  };
+
+  // borra una foto que el producto YA tenía (no una de las recién
+  // elegidas, esas se sacan de photoFiles nomás) — acción inmediata,
+  // separada del guardado del resto del form, mismo criterio que ya usa
+  // "Reactivar"/"Dar de baja" en las otras páginas del panel.
+  const handleDeleteFoto = async (idFoto: number) => {
+    if (!editingId) {
+      return;
+    }
+
+    setDeletingFotoId(idFoto);
+
+    try {
+      const updated = await deleteProductPhotoService(editingId, idFoto);
+      setCurrentFotos(updated.fotos);
+    } catch (error) {
+      setFormError(getErrorMessage(error));
+    } finally {
+      setDeletingFotoId(null);
     }
   };
 
@@ -221,6 +269,15 @@ function ProductFormPage() {
               onChange={(e) => setForm({ ...form, stock: e.target.value })}
               className="border border-gray-300 rounded-md px-3 py-2 w-full"
             />
+            <label className="flex items-center gap-2 mt-1 text-sm text-gray-600">
+              <input
+                type="checkbox"
+                checked={form.mostrarStock}
+                onChange={(e) => setForm({ ...form, mostrarStock: e.target.checked })}
+                className="cursor-pointer"
+              />
+              Mostrar stock a los clientes
+            </label>
           </div>
           <div className="sm:col-span-2">
             <label htmlFor="descripcion">Descripción</label>
@@ -232,12 +289,12 @@ function ProductFormPage() {
             />
           </div>
           <div className="sm:col-span-2">
-            <label htmlFor="imagen">Imagen</label>
+            <label htmlFor="imagen">Imagen (portada)</label>
             {currentImageUrl && (
               <img
                 src={`${apiOrigin}${currentImageUrl}`}
                 alt={form.nombre}
-                className="h-16 w-16 object-cover rounded-md mb-2"
+                className="h-16 w-16 object-contain bg-gray-100 rounded-md mb-2"
               />
             )}
             <input
@@ -246,6 +303,58 @@ function ProductFormPage() {
               accept="image/jpeg,image/png,image/webp"
               onChange={(e) => setImageFile(e.target.files?.[0] ?? null)}
             />
+          </div>
+          <div className="sm:col-span-2">
+            <label htmlFor="fotos">Fotos adicionales (opcional, podés elegir varias)</label>
+
+            {currentFotos.length > 0 && (
+              <div className="flex flex-wrap gap-2 mb-2">
+                {currentFotos.map((foto) => (
+                  <div key={foto.idProductoImagen} className="relative">
+                    <img
+                      src={`${apiOrigin}${foto.imageUrl}`}
+                      alt=""
+                      className="h-16 w-16 object-contain bg-gray-100 rounded-md"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteFoto(foto.idProductoImagen)}
+                      disabled={deletingFotoId === foto.idProductoImagen}
+                      aria-label="Eliminar foto"
+                      className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center rounded-full bg-white border border-gray-300 text-red-600 text-xs leading-none cursor-pointer disabled:cursor-not-allowed"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <input
+              id="fotos"
+              type="file"
+              multiple
+              accept="image/jpeg,image/png,image/webp"
+              onChange={(e) => setPhotoFiles(Array.from(e.target.files ?? []))}
+            />
+            {photoFiles.length > 0 && (
+              <ul className="mt-1 text-sm text-gray-600">
+                {photoFiles.map((file, index) => (
+                  <li key={`${file.name}-${index}`} className="flex items-center gap-2">
+                    {file.name}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPhotoFiles((files) => files.filter((_, i) => i !== index))
+                      }
+                      className="text-red-600 hover:underline cursor-pointer"
+                    >
+                      Quitar
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         </div>
 

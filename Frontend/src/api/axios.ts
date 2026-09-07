@@ -3,19 +3,20 @@ import axios from 'axios';
 import { apiUrl } from '@/utilities';
 import { UserKey } from '@/redux/states/user';
 import { PublicRoutes } from '@/models';
-import { servidorNoDisponibleAlert } from '@/utilities/alerts/session-alerts.utils';
 
 export const api = axios.create({
   baseURL: apiUrl,
 });
 
 /**
- * Evita disparar varias alertas/redirecciones a la vez cuando el
- * servidor está caído: varios componentes pueden estar pidiendo datos
- * en paralelo y todos van a fallar con el mismo error de conexión casi
- * al mismo tiempo.
+ * Evita disparar varias redirecciones a la vez cuando el servidor está
+ * caído: varios componentes pueden estar pidiendo datos en paralelo y
+ * todos van a fallar con el mismo error de conexión casi al mismo tiempo.
+ * Al redirigir con `window.location.href` (recarga dura), este módulo se
+ * reinstancia solo en la página nueva — no hace falta resetear la
+ * bandera a mano.
  */
-let avisandoServidorCaido = false;
+let redirigiendoPorServidorCaido = false;
 
 api.interceptors.request.use(
   (config) => {
@@ -47,19 +48,25 @@ api.interceptors.response.use(
 
     } else if (!error.response) {
 
-      // No hubo respuesta del servidor: caído, sin red, o similar
-      // (ej. ERR_CONNECTION_REFUSED). Se cierra la sesión igual que en
-      // un 401, para forzar un login nuevo cuando el servidor vuelva.
-      const enLogin = window.location.pathname.startsWith(`/${PublicRoutes.LOGIN}`);
+      // No hubo respuesta del servidor: caído, sin red, o similar (ej.
+      // ERR_CONNECTION_REFUSED). Se cierra la sesión igual que en un 401
+      // (fuerza un login nuevo cuando el servidor vuelva), pero a
+      // diferencia del 401 NO se redirige a /login: un visitante anónimo
+      // navegando el catálogo público nunca tuvo sesión, y mandarlo a una
+      // pantalla de login que tampoco va a poder autenticar (el servidor
+      // sigue caído) no tiene sentido. Va a una página dedicada
+      // (ServiceUnavailable) que no le pega a la API al montarse, para no
+      // repetir este mismo error apenas aterriza ahí.
+      const enPaginaServicioNoDisponible = window.location.pathname.startsWith(
+        `/${PublicRoutes.SERVICE_UNAVAILABLE}`,
+      );
 
-      if (!avisandoServidorCaido && !enLogin) {
-        avisandoServidorCaido = true;
+      if (!redirigiendoPorServidorCaido && !enPaginaServicioNoDisponible) {
+        redirigiendoPorServidorCaido = true;
 
         localStorage.removeItem(UserKey);
 
-        servidorNoDisponibleAlert().then(() => {
-          window.location.href = `/${PublicRoutes.LOGIN}`;
-        });
+        window.location.href = `/${PublicRoutes.SERVICE_UNAVAILABLE}`;
       }
     }
 

@@ -15,6 +15,7 @@ import RoutesWithNotFound from './utilities/RoutesWithNotFound.utility'
 import GuestPage from './pages/Private/Guest/Guest'
 import Catalog from './pages/Public/Catalog/Catalog'
 import ProductDetail from './pages/Public/ProductDetail/ProductDetail'
+import ServiceUnavailable from './pages/Public/ServiceUnavailable/ServiceUnavailable'
 
 const Login = lazy(() => import('./pages/Login/Login'))
 const Private = lazy(() => import('./pages/Private/Private'))
@@ -38,6 +39,13 @@ function App() {
                 <Route path='/' element={<Catalog />} />
                 <Route path='productos/:id' element={<ProductDetail />} />
                 <Route path={PublicRoutes.LOGIN} element={<Login />} />
+                {/* destino del interceptor de axios cuando no hay respuesta del
+                    servidor (ver src/api/axios.ts) — pública, sin login, y sin
+                    fetch propio al montarse (ver ServiceUnavailable.tsx) */}
+                <Route
+                  path={PublicRoutes.SERVICE_UNAVAILABLE}
+                  element={<ServiceUnavailable />}
+                />
                 {/* No hay signup público en el backend (POST /auth/nuevo-usuario
                     requiere ADMIN) — la ruta de registro queda deshabilitada.
                     pages/Register/Register.tsx y services/register.service.ts

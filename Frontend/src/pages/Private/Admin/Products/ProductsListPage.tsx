@@ -13,6 +13,15 @@ import { showError } from '@/utilities/alerts/alert.utils';
 import { Button } from '@/components/ui';
 import { InputBuscarProductos } from '@/components/ProductSearch/InputBuscarProductos';
 
+// mismo criterio que Catalog.tsx: el backend ya soporta paginado por
+// cantidad (GET /productos/admin/listado acepta page/limit, límite máximo
+// 50 — ver FindProductsQueryDto), esto es solo conectarlo acá. Se eligió
+// paginado por cantidad y no por letra inicial: agrupar por letra no
+// acota nada (una letra con cientos de productos seguiría siendo una
+// lista larga, habría que paginarla igual) y ya existe el buscador en
+// vivo para encontrar un producto puntual por nombre.
+const PAGE_SIZE = 30;
+
 /** Listado de productos del panel admin — separado de "nuevo producto"
  * (Products/ProductFormPage.tsx en modo creación) y de "categorías"
  * (Categories/CategoriesPage.tsx). "Editar" navega a su propia página en
@@ -21,6 +30,8 @@ function ProductsListPage() {
   const navigate = useNavigate();
 
   const [products, setProducts] = useState<Product[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [listError, setListError] = useState('');
   const [reloadToken, setReloadToken] = useState(0);
@@ -38,10 +49,13 @@ function ProductsListPage() {
       try {
         const data = await getAdminProductsService({
           search: search || undefined,
-          limit: 50,
+          page,
+          limit: PAGE_SIZE,
         });
 
-        if (!cancelado) setProducts(data.items);
+        if (cancelado) return;
+        setProducts(data.items);
+        setTotal(data.total);
       } catch (error) {
         if (!cancelado) setListError(getErrorMessage(error));
       } finally {
@@ -52,12 +66,15 @@ function ProductsListPage() {
     return () => {
       cancelado = true;
     };
-  }, [search, reloadToken]);
+  }, [search, page, reloadToken]);
 
   const handleSearchSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    setPage(1);
     setSearch(searchInput.trim());
   };
+
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   // seleccionar un resultado del buscador en vivo salta directo a
   // editarlo, sin pasar por el submit del botón "Buscar".
@@ -146,7 +163,11 @@ function ProductsListPage() {
                 <td className="py-2">{product.nombre}</td>
                 <td className="py-2">{product.categoria?.nombre ?? '—'}</td>
                 <td className="py-2">${product.precio.toFixed(2)}</td>
-                <td className="py-2">{product.stock}</td>
+                {/* siempre el número real acá (esta vista nunca lo oculta,
+                    ver Product.mostrarStock) — ?? 0 es solo para
+                    satisfacer el tipo number | null compartido con las
+                    vistas públicas, nunca debería pasar en la práctica. */}
+                <td className="py-2">{product.stock ?? 0}</td>
                 <td className="py-2">
                   {product.deletedAt ? (
                     <span className="text-red-600">Inactivo</span>
@@ -178,6 +199,28 @@ function ProductsListPage() {
           <p className="mt-4">No hay productos para mostrar.</p>
         )}
       </div>
+
+      {totalPages > 1 && (
+        <div className="flex justify-center items-center gap-4 mt-6">
+          <Button
+            variant="secondary"
+            disabled={page <= 1}
+            onClick={() => setPage((p) => p - 1)}
+          >
+            Anterior
+          </Button>
+          <span>
+            Página {page} de {totalPages}
+          </span>
+          <Button
+            variant="secondary"
+            disabled={page >= totalPages}
+            onClick={() => setPage((p) => p + 1)}
+          >
+            Siguiente
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

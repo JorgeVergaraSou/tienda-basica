@@ -92,24 +92,71 @@ base; `AuthController`/`AuthService` son la única capa expuesta por HTTP — no
   una categoría nueva no requiere tocar código ni rebuildear ni el back ni el front.
 - `ProductEntity` (tabla `products`): `nombre`, `descripcion`, `precio` (decimal con transformer a
   number — el driver de MySQL devuelve DECIMAL como string), `stock`, `imageFile` (mismo patrón
-  que `UserEntity.imageFile`: solo el nombre de archivo, servido desde `/uploads/products/`),
-  soft-delete, `categoria` como relación `@ManyToOne(() => CategoryEntity)` (FK `id_categoria`,
-  nullable), y `creadoPor` como relación `@ManyToOne(() => UserEntity)` (FK `creado_por_id`,
-  nullable) — quién cargó el producto, seteado una sola vez al crear (ver más abajo).
-  `ProductsService` valida el `idCategoria` que manda el cliente contra una categoría real
-  (`CategoriesService.findActivaByIdOrThrow`, 400 si no existe) — `ProductsModule` importa
-  `CategoriesModule` para esto.
+  que `UserEntity.imageFile`: solo el nombre de archivo, servido desde `/uploads/products/`) como
+  **portada/imagen principal**, soft-delete, `categoria` como relación
+  `@ManyToOne(() => CategoryEntity)` (FK `id_categoria`, nullable), y `creadoPor` como relación
+  `@ManyToOne(() => UserEntity)` (FK `creado_por_id`, nullable) — quién cargó el producto, seteado
+  una sola vez al crear (ver más abajo). `ProductsService` valida el `idCategoria` que manda el
+  cliente contra una categoría real (`CategoriesService.findActivaByIdOrThrow`, 400 si no existe)
+  — `ProductsModule` importa `CategoriesModule` para esto.
+- **Galería de fotos** (`ProductImageEntity`, tabla `product_images`, agregada después de
+  `imageFile`): un producto puede tener además **0 o más fotos adicionales**, cada una su propia
+  fila (`id_producto_imagen`, `producto_id` FK a `products`, `image_file`, `created_at`) — se
+  agregan/eliminan de a una, nunca se reemplazan todas juntas. Deliberadamente **no** reemplaza a
+  `imageFile`: la portada sigue siendo `imageFile` con su mismo endpoint de siempre
+  (`POST /productos/:id/imagen`, que la reemplaza); la galería es un mecanismo aparte y conviven
+  los dos (menor radio de impacto: no rompe los 5 lugares del frontend que ya leían
+  `imageUrl` como string único). Sin soft-delete en `ProductImageEntity` a propósito — no hay caso
+  de uso de "restaurar una foto borrada", así que `eliminarFoto` borra la fila y el archivo del
+  disco a la vez. **Migración de datos legacy**: como no hay sistema de migraciones en este
+  proyecto (`synchronize: true`, ver más abajo), `ProductsService` implementa
+  `OnApplicationBootstrap` y en cada arranque (`migrarImagenesLegacy`, idempotente) recorre los
+  productos con `imageFile` no nulo y sin ninguna fila todavía en `product_images`, y les crea una
+  — pero **duplicando el archivo** (nombre nuevo por UUID) en vez de referenciar el mismo nombre
+  que `imageFile`: si compartieran archivo, un reemplazo posterior de la portada
+  (`actualizarImagen`, que borra el archivo viejo del disco) dejaría la foto migrada apuntando a
+  un archivo borrado. Con la copia, portada y galería quedan desacopladas para siempre desde el
+  momento de la migración.
 - **Permisos de `ProductsController`**: `GET /productos` y `GET /productos/:id` públicos
-  (catálogo). `POST /productos` (crear) y `POST /productos/:id/imagen` (subir/cambiar imagen) son
+  (catálogo). `POST /productos` (crear), `POST /productos/:id/imagen` (subir/cambiar portada),
+  `POST /productos/:id/fotos` (agregar una foto a la galería) y
+  `DELETE /productos/:id/fotos/:idFoto` (eliminar una foto puntual de la galería, por su ID) son
   `@Auth(Role.ADMIN, Role.USER)` — el resto (`PATCH/DELETE /productos/:id`, `/activar`,
   `GET /productos/admin/listado`, `GET /productos/admin/:id`) sigue siendo `@Auth(Role.ADMIN)`
-  exclusivo. Un USER puede cargar productos nuevos y subirles imagen, pero **no** editarlos, darlos
-  de baja/reactivarlos, ni tocar categorías — ese límite no lo puede expresar el `RolesGuard` (no
-  sabe de quién es cada producto), así que `ProductsService.actualizarImagen` chequea a mano
+  exclusivo. Un USER puede cargar productos nuevos y subirles/agregarles/quitarles fotos, pero
+  **no** editarlos, darlos de baja/reactivarlos, ni tocar categorías — ese límite no lo puede
+  expresar el `RolesGuard` (no sabe de quién es cada producto), así que
+  `ProductsService.actualizarImagen`/`agregarFoto`/`eliminarFoto` chequean a mano
   `product.creadoPor?.idUser === activeUser.idUser` cuando `activeUser.role !== Role.ADMIN`, y
-  tira `ForbiddenException` si no coincide. `ADMIN` no tiene esta restricción (puede tocar la
-  imagen de cualquier producto). Controller y service reciben el usuario activo vía
-  `@ActiveUser()` (mismo decorador que usa `auth/`).
+  tiran `ForbiddenException` si no coincide — el chequeo es siempre sobre el dueño del *producto*,
+  nunca sobre la foto en sí (`ProductImageEntity` no tiene su propio `creadoPor`). `ADMIN` no tiene
+  esta restricción. `eliminarFoto` además valida que la foto (`idFoto`) pertenezca al producto
+  (`:id`) de la URL — si no, 404, no solo 403 — para que un USER dueño de su propio producto no
+  pueda borrar, adivinando el ID, una foto de un producto ajeno. Controller y service reciben el
+  usuario activo vía `@ActiveUser()` (mismo decorador que usa `auth/`).
+- `GET /productos`, `GET /productos/:id`, `GET /productos/admin/:id` y
+  `GET /productos/mis-productos` devuelven `ProductResponseDto` con `imageUrl` (portada, como
+  siempre) **y** `fotos: ProductImageResponseDto[]` (galería, siempre un array — vacío si no tiene
+  fotos adicionales, nunca `undefined`).
+- **Visibilidad del stock** (`ProductEntity.mostrarStock`, `boolean`, `default: true` — pedido
+  explícito del usuario): el dueño de un producto puede elegir que el número de `stock` no se
+  muestre a los clientes. La columna no cambia nada de la lógica de stock en sí, solo si las
+  lecturas **públicas** revelan el número real: `ProductsService.toPublicResponseDto` envuelve a
+  `toResponseDto` y devuelve `stock: null` en vez del número cuando `mostrarStock` es `false` — se
+  usa en `findOneActivo` (`GET /productos/:id`) y en `buscarProductos` cuando
+  `incluirInactivos: false` (`GET /productos`, es decir `findAllActivos`). Las vistas privilegiadas
+  (`findAllAdmin`, `findMisProductos`, `findOneAdmin`, y la respuesta de cualquier mutación) siempre
+  usan `toResponseDto` directo — ADMIN y el USER dueño del producto necesitan ver el stock real para
+  gestionar su inventario, la preferencia solo afecta lo que ve un cliente anónimo. `mostrarStock`
+  en sí viaja siempre con su valor real en el DTO, incluso en las respuestas públicas — no es dato
+  sensible, y el frontend lo necesita para no confundir "stock null porque está oculto" con "stock
+  0 porque no hay". `CreateProductDto`/`UpdateProductDto` aceptan `mostrarStock` opcional (si se
+  omite, aplica el default de la columna). Como `PATCH /productos/:id` (el edit general) sigue
+  siendo `@Auth(Role.ADMIN)` exclusivo, existe un endpoint dedicado
+  `PATCH /productos/:id/visibilidad-stock` (`UpdateStockVisibilityDto`, body `{ mostrarStock }`)
+  `@Auth(Role.ADMIN, Role.USER)` con el mismo chequeo de ownership que `actualizarImagen`/`activar` —
+  así un USER puede tocar únicamente este campo en un producto propio sin que haga falta abrirle el
+  PATCH general (que sigue dejando editar nombre/precio/etc. solo a ADMIN).
 - `GET /productos/admin/:id` (ADMIN): a diferencia del `GET /productos/:id` público, sí devuelve
   productos dados de baja — lo usa la página de editar producto del frontend, que se puede cargar
   directo por URL (no solo navegando desde un listado que ya tiene los datos en memoria).
@@ -144,6 +191,32 @@ base; `AuthController`/`AuthService` son la única capa expuesta por HTTP — no
   `restore()` para dar de baja/reactivar, `handleServiceError` en cada catch, un logger de módulo
   propio en `module-loggers.ts` (`productsErrorLogger`, `categoriesErrorLogger`), y
   `insertLogger`/`updateLogger`/`deleteLogger` de `db-loggers.ts` después de cada mutación.
+
+**CRUD de usuarios para ADMIN** (pedido explícito del usuario): además de lo que ya existía
+(`POST /auth/nuevo-usuario` crear, `GET /auth/listar-usuarios` listar, `DELETE
+/auth/dar-de-baja-usuario/:id` + `PATCH /auth/activar-usuario/:id` dar de baja/reactivar — los
+cuatro `@Auth(Role.ADMIN)`, todos ya existían), se agregó `PATCH /auth/editar-usuario/:id`
+(`@Auth(Role.ADMIN)`, `AdminUpdateUserDto`) — antes un ADMIN no tenía forma de editar los datos de
+**otro** usuario: el único endpoint de edición (`PATCH /auth/updateUser/:id`, autoservicio) exige
+que `:id` coincida con el propio usuario del JWT (`ForbiddenException` si no) y pide
+`currentPassword` para confirmar. El nuevo `UsersService.actualizarUsuarioAdmin`
+(`AdminUpdateUserDto`: `nickUsuario`/`nombre`/`apellido`/`email`/`role`/`password`, todos
+opcionales) es deliberadamente distinto de `updateUser` (autoservicio, sin tocar): no pide
+contraseña — ni la del usuario editado (el ADMIN no la conoce) ni la propia (el ADMIN ya está
+autenticado por su JWT) — y además permite cambiar `role` y setear una `password` nueva
+directamente, pensado para recuperar el acceso de un usuario que la perdió (no pasa por el flujo
+de reset por email).
+
+**Protección del último ADMIN** (pedido explícito del usuario, motivado por el CRUD de arriba: con
+un panel que hace mucho más fácil dar de baja o cambiar el rol de cualquiera por error, hacía falta
+esta protección que antes no existía): `UsersService.esUnicoAdminActivo()` (privado, cuenta
+`role: ADMIN` con `.count()` sin `withDeleted:true` — ya excluye soft-deleted por default) se
+consulta en dos lugares, siempre cuando el usuario en cuestión YA es `ADMIN` activo (si el conteo
+da `<= 1` en ese momento, tiene que ser justo ese): `darDeBajaUsuario` (400 "No podés dar de baja al
+único administrador activo") y `actualizarUsuarioAdmin` cuando `dto.role` cambia a algo distinto de
+`ADMIN` (400 "No podés quitarle el rol de administrador al único administrador activo"). No hay
+protección equivalente contra editar/dar de baja tu propia cuenta desde este panel siendo el único
+ADMIN de otra forma que no sea cambiar el rol o darte de baja — ambas caen en los mismos chequeos.
 
 **Identidad de login**: `nickUsuario`, no `email`, es el identificador de login — el email es
 opcional y solo queda asociado a una cuenta la primera vez que se pide recuperar la contraseña

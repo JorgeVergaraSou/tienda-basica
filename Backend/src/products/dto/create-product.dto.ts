@@ -1,5 +1,6 @@
 import { Transform } from 'class-transformer';
 import {
+  IsBoolean,
   IsInt,
   IsNumber,
   IsOptional,
@@ -30,6 +31,13 @@ export class CreateProductDto {
   @IsInt({ message: 'El stock debe ser un número entero' })
   @Min(0, { message: 'El stock no puede ser negativo' })
   stock?: number;
+
+  /** si se omite, la columna aplica su default (true — ver
+   * ProductEntity.mostrarStock): controla si el número de stock se
+   * muestra a los clientes en el catálogo público. */
+  @IsOptional()
+  @IsBoolean({ message: 'mostrarStock debe ser un valor booleano' })
+  mostrarStock?: boolean;
 
   /** id de una categoría existente (ver CategoriesModule) — null/omitido
    * significa "sin categoría". @IsOptional() de class-validator ya trata

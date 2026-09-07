@@ -3,12 +3,15 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  OnApplicationBootstrap,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { FindOptionsWhere, ILike, IsNull, Repository } from 'typeorm';
-import { existsSync, unlinkSync } from 'fs';
-import { join } from 'path';
+import { FindOptionsWhere, ILike, IsNull, Not, Repository } from 'typeorm';
+import { copyFileSync, existsSync, unlinkSync } from 'fs';
+import { extname, join } from 'path';
+import { randomUUID } from 'crypto';
 import { ProductEntity } from './entities/product.entity';
+import { ProductImageEntity } from './entities/product-image.entity';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { FindProductsQueryDto } from './dto/find-products-query.dto';
@@ -25,13 +28,108 @@ import { handleServiceError } from '@/common/utils/error-handler.util';
 import { productsErrorLogger } from '@/config/module-loggers';
 import { deleteLogger, insertLogger, updateLogger } from '@/config/db-loggers';
 
+/** relaciones + orden que necesita cualquier lectura que vaya a mostrarse
+ * al cliente (listados y detalle) — 'fotos' ordenadas por id ascendente
+ * (= orden de creación, la más vieja primero) porque no hay un campo de
+ * orden explícito, y no hace falta: alcanza con que sea estable. */
+const RELACIONES_LECTURA = ['categoria', 'creadoPor', 'fotos'] as const;
+const ORDEN_FOTOS = { fotos: { idProductoImagen: 'ASC' as const } };
+
 @Injectable()
-export class ProductsService {
+export class ProductsService implements OnApplicationBootstrap {
   constructor(
     @InjectRepository(ProductEntity)
     private readonly productRepository: Repository<ProductEntity>,
+    @InjectRepository(ProductImageEntity)
+    private readonly productImageRepository: Repository<ProductImageEntity>,
     private readonly categoriesService: CategoriesService,
   ) {}
+
+  async onApplicationBootstrap() {
+    await this.migrarImagenesLegacy();
+  }
+
+  /** productos cargados antes de que existiera la galería (product_images)
+   * solo tienen imageFile (portada). Para que esos productos no arranquen
+   * con la galería vacía, cada uno que tenga imageFile y todavía no tenga
+   * ninguna fila en product_images se migra una sola vez: se duplica el
+   * archivo (nunca se referencia el mismo nombre que imageFile) bajo un
+   * nombre nuevo y se crea una fila de galería apuntando a esa copia.
+   *
+   * Duplicar en vez de reutilizar el mismo archivo es deliberado: si en
+   * el futuro alguien reemplaza la portada, actualizarImagen() borra del
+   * disco el imageFile viejo (comportamiento actual, sin tocar) — si la
+   * foto migrada compartiera ese mismo nombre de archivo, quedaría
+   * apuntando a un archivo borrado. Con la copia, portada y galería
+   * quedan totalmente desacopladas desde el momento de la migración.
+   *
+   * Corre en cada arranque (no una sola vez con un flag), pero es
+   * idempotente: un producto que ya tiene alguna fila en product_images
+   * (migrada antes, o cargada a mano con agregarFoto) se salta siempre.
+   * No debe tirar abajo el arranque de la app si algo falla acá — se
+   * loguea y sigue. */
+  private async migrarImagenesLegacy() {
+    try {
+      const productos = await this.productRepository.find({
+        where: { imageFile: Not(IsNull()) },
+        withDeleted: true,
+      });
+
+      for (const producto of productos) {
+        const yaTieneFotos = await this.productImageRepository.count({
+          where: { producto: { idProducto: producto.idProducto } },
+        });
+
+        if (yaTieneFotos > 0) {
+          continue;
+        }
+
+        const nombreOriginal = producto.imageFile as string;
+        const rutaOriginal = join(
+          process.cwd(),
+          'uploads',
+          'products',
+          nombreOriginal,
+        );
+
+        // si el archivo ya no está en disco no hay nada para copiar — no
+        // rompemos el arranque por esto. productsErrorLogger está creado
+        // con level:'error' (ver module-loggers.ts), así que se loguea con
+        // .error (un .warn acá quedaría filtrado y no escribiría nada).
+        if (!existsSync(rutaOriginal)) {
+          productsErrorLogger.error(
+            `Migración de imagen legacy: el archivo de imageFile no existe en disco (producto ID ${producto.idProducto}, archivo ${nombreOriginal})`,
+          );
+          continue;
+        }
+
+        const nuevoNombre = `${randomUUID()}${extname(nombreOriginal)}`;
+        const rutaNueva = join(
+          process.cwd(),
+          'uploads',
+          'products',
+          nuevoNombre,
+        );
+
+        copyFileSync(rutaOriginal, rutaNueva);
+
+        await this.productImageRepository.save({
+          producto: { idProducto: producto.idProducto } as ProductEntity,
+          imageFile: nuevoNombre,
+        });
+
+        insertLogger.info(
+          `Foto migrada desde imageFile legacy (producto ID ${producto.idProducto}): ${nuevoNombre} (copia de ${nombreOriginal})`,
+        );
+      }
+    } catch (error) {
+      productsErrorLogger.error(
+        `Error migrando imágenes legacy a product_images: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+  }
 
   async crearProducto(
     dto: CreateProductDto,
@@ -131,15 +229,23 @@ export class ProductsService {
 
       const [items, total] = await this.productRepository.findAndCount({
         where,
-        relations: ['categoria'],
+        relations: [...RELACIONES_LECTURA],
         withDeleted: true,
-        order: { nombre: 'ASC' },
+        order: { nombre: 'ASC', ...ORDEN_FOTOS },
         skip: (page - 1) * limit,
         take: limit,
       });
 
       return {
-        items: items.map((item) => this.toResponseDto(item)),
+        // el catálogo público (incluirInactivos: false) no revela el stock
+        // real si el dueño eligió ocultarlo — ver toPublicResponseDto. Las
+        // vistas privilegiadas (admin/listado, mis-productos) siempre son
+        // incluirInactivos: true, y siempre ven el stock real.
+        items: items.map((item) =>
+          incluirInactivos
+            ? this.toResponseDto(item)
+            : this.toPublicResponseDto(item),
+        ),
         total,
         page,
         limit,
@@ -182,15 +288,16 @@ export class ProductsService {
     try {
       const product = await this.productRepository.findOne({
         where: { idProducto: id, deletedAt: IsNull() },
-        relations: ['categoria'],
+        relations: [...RELACIONES_LECTURA],
         withDeleted: true,
+        order: ORDEN_FOTOS,
       });
 
       if (!product) {
         throw new NotFoundException('Producto no encontrado');
       }
 
-      return this.toResponseDto(product);
+      return this.toPublicResponseDto(product);
     } catch (error) {
       handleServiceError(
         error,
@@ -246,7 +353,10 @@ export class ProductsService {
    * ADMIN puede tocar la imagen de cualquier producto; USER solo la del
    * que él mismo cargó (ver ProductEntity.creadoPor) — RolesGuard ya deja
    * pasar a ambos roles por el @Auth del controller, así que la
-   * diferencia de permisos se resuelve acá adentro. */
+   * diferencia de permisos se resuelve acá adentro.
+   *
+   * Esto sigue siendo solo la portada (imageFile) — para agregar/quitar
+   * fotos de la galería ver agregarFoto/eliminarFoto. */
   async actualizarImagen(
     id: number,
     file: Express.Multer.File,
@@ -293,6 +403,113 @@ export class ProductsService {
         'ProductsService.actualizarImagen',
         'Error al actualizar la imagen del producto',
         { id },
+      );
+    }
+  }
+
+  /** agrega una foto nueva a la galería del producto — a diferencia de
+   * actualizarImagen (que reemplaza la portada), esto se suma a las fotos
+   * que ya tiene, sin tocarlas. Mismo chequeo de ownership que
+   * actualizarImagen/activarProducto: ADMIN sin restricción, USER solo en
+   * productos que él mismo cargó. */
+  async agregarFoto(
+    id: number,
+    file: Express.Multer.File,
+    activeUser: UserActiveInterface,
+  ): Promise<ProductResponseDto> {
+    try {
+      if (!file) {
+        throw new BadRequestException('Debe adjuntar una imagen');
+      }
+
+      const product = await this.getProductoWithDeleted(id);
+
+      if (
+        activeUser.role !== Role.ADMIN &&
+        product.creadoPor?.idUser !== activeUser.idUser
+      ) {
+        throw new ForbiddenException(
+          'No podés agregar fotos a un producto que no cargaste vos',
+        );
+      }
+
+      await this.productImageRepository.save({
+        producto: { idProducto: id } as ProductEntity,
+        imageFile: file.filename,
+      });
+
+      insertLogger.info(
+        `Foto agregada a producto (ID ${id}): ${file.filename}`,
+      );
+
+      const updated = await this.getProductoWithDeleted(id);
+      return this.toResponseDto(updated);
+    } catch (error) {
+      handleServiceError(
+        error,
+        productsErrorLogger,
+        'ProductsService.agregarFoto',
+        'Error al agregar la foto al producto',
+        { id },
+      );
+    }
+  }
+
+  /** elimina una foto puntual de la galería del producto (por su ID, no
+   * todas) — mismo chequeo de ownership que agregarFoto. Además valida
+   * que la foto realmente pertenezca al producto :id (no solo que exista
+   * en la base): sin este chequeo, un USER dueño de su propio producto
+   * podría adivinar el ID de una foto de un producto ajeno y borrarla
+   * igual, porque el ownership de arriba solo mira el producto de la URL,
+   * no de quién es cada fila de product_images. */
+  async eliminarFoto(
+    id: number,
+    idFoto: number,
+    activeUser: UserActiveInterface,
+  ): Promise<ProductResponseDto> {
+    try {
+      const product = await this.getProductoWithDeleted(id);
+
+      if (
+        activeUser.role !== Role.ADMIN &&
+        product.creadoPor?.idUser !== activeUser.idUser
+      ) {
+        throw new ForbiddenException(
+          'No podés eliminar fotos de un producto que no cargaste vos',
+        );
+      }
+
+      const foto = await this.productImageRepository.findOne({
+        where: {
+          idProductoImagen: idFoto,
+          producto: { idProducto: id },
+        },
+      });
+
+      if (!foto) {
+        throw new NotFoundException('Foto no encontrada');
+      }
+
+      const ruta = join(process.cwd(), 'uploads', 'products', foto.imageFile);
+
+      if (existsSync(ruta)) {
+        unlinkSync(ruta);
+      }
+
+      await this.productImageRepository.delete(foto.idProductoImagen);
+      deleteLogger.info(
+        `Foto eliminada de producto (ID ${id}, foto ID ${idFoto})`,
+      );
+
+      const updated = await this.getProductoWithDeleted(id);
+      return this.toResponseDto(updated);
+    } catch (error) {
+      handleServiceError(
+        error,
+        productsErrorLogger,
+        'ProductsService.eliminarFoto',
+        'Error al eliminar la foto del producto',
+        { id, idFoto },
       );
     }
   }
@@ -356,6 +573,46 @@ export class ProductsService {
     }
   }
 
+  /** endpoint dedicado (mismo patrón que actualizarImagen/activarProducto)
+   * para que un USER pueda tocar la visibilidad pública del stock en un
+   * producto propio, sin abrir el PATCH general (ADMIN-only) a otros
+   * roles — ver UpdateStockVisibilityDto. ADMIN también puede usarlo (o,
+   * como cualquier otro campo, setearlo directo en actualizarProducto). */
+  async actualizarVisibilidadStock(
+    id: number,
+    mostrarStock: boolean,
+    activeUser: UserActiveInterface,
+  ): Promise<ProductResponseDto> {
+    try {
+      const product = await this.getProductoWithDeleted(id);
+
+      if (
+        activeUser.role !== Role.ADMIN &&
+        product.creadoPor?.idUser !== activeUser.idUser
+      ) {
+        throw new ForbiddenException(
+          'No podés modificar la visibilidad del stock de un producto que no cargaste vos',
+        );
+      }
+
+      await this.productRepository.update(id, { mostrarStock });
+      updateLogger.info(
+        `Visibilidad de stock actualizada (ID ${id}): mostrarStock=${mostrarStock}`,
+      );
+
+      const updated = await this.getProductoWithDeleted(id);
+      return this.toResponseDto(updated);
+    } catch (error) {
+      handleServiceError(
+        error,
+        productsErrorLogger,
+        'ProductsService.actualizarVisibilidadStock',
+        'Error al actualizar la visibilidad del stock',
+        { id },
+      );
+    }
+  }
+
   /** valida el idCategoria que manda el cliente contra una categoría real
    * (ver CategoriesService.findActivaByIdOrThrow) — undefined/null significa
    * "sin categoría". */
@@ -372,8 +629,9 @@ export class ProductsService {
   private async getProductoWithDeleted(id: number): Promise<ProductEntity> {
     const product = await this.productRepository.findOne({
       where: { idProducto: id },
-      relations: ['categoria', 'creadoPor'],
+      relations: [...RELACIONES_LECTURA],
       withDeleted: true,
+      order: ORDEN_FOTOS,
     });
 
     if (!product) {
@@ -399,7 +657,27 @@ export class ProductsService {
       imageUrl: product.imageFile
         ? `/uploads/products/${product.imageFile}`
         : null,
+      // (product.fotos ?? []) por las dudas: si algún llamador interno
+      // llegara a construir el DTO a partir de un product sin la relación
+      // 'fotos' cargada, mejor un array vacío que un undefined que rompa
+      // al cliente.
+      fotos: (product.fotos ?? []).map((foto) => ({
+        idProductoImagen: foto.idProductoImagen,
+        imageUrl: `/uploads/products/${foto.imageFile}`,
+      })),
+      mostrarStock: product.mostrarStock,
       deletedAt: product.deletedAt,
     };
+  }
+
+  /** versión del DTO para lecturas públicas (catálogo, detalle público):
+   * no revela el stock real si el dueño eligió ocultarlo — ver
+   * ProductEntity.mostrarStock. `mostrarStock` en sí siempre viaja con su
+   * valor real (no es información sensible, y el frontend la necesita
+   * para distinguir "sin stock" de "el dueño no quiere mostrar el
+   * stock"). */
+  private toPublicResponseDto(product: ProductEntity): ProductResponseDto {
+    const dto = this.toResponseDto(product);
+    return product.mostrarStock ? dto : { ...dto, stock: null };
   }
 }

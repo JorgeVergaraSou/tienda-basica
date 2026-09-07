@@ -5,11 +5,13 @@ import {
   Entity,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import { CategoryEntity } from '@/categories/entities/category.entity';
 import { UserEntity } from '@/users/entities/user.entity';
+import { ProductImageEntity } from './product-image.entity';
 
 @Entity('products')
 export class ProductEntity {
@@ -48,6 +50,23 @@ export class ProductEntity {
   })
   stock!: number;
 
+  /** si es false, las lecturas públicas (GET /productos, GET /productos/:id
+   * — ver ProductsService.toPublicResponseDto) devuelven `stock: null` en
+   * vez del número real. Es solo una preferencia de cara al cliente: ADMIN
+   * y el USER dueño del producto siempre ven el stock real en sus propias
+   * vistas (admin/listado, admin/:id, mis-productos, y la respuesta de
+   * cualquier mutación), la columna no cambia nada de la lógica de
+   * stock/pedidos en sí. Default true: preserva el comportamiento de
+   * siempre (stock visible) tanto para productos ya cargados como para
+   * los nuevos que no manden el campo — mismo patrón que `stock` arriba. */
+  @Column({
+    type: 'boolean',
+    nullable: false,
+    default: true,
+    name: 'mostrar_stock',
+  })
+  mostrarStock!: boolean;
+
   /** relación a categories — el ADMIN crea/renombra/da de baja categorías
    * libremente desde su propio CRUD (ver CategoriesModule), sin tocar
    * código ni rebuildear cada vez que hace falta una nueva. onDelete:
@@ -65,6 +84,14 @@ export class ProductEntity {
    * /uploads/products/<archivo> (ver main.ts). */
   @Column({ type: 'varchar', nullable: true, name: 'image_file' })
   imageFile!: string | null;
+
+  /** fotos adicionales del producto (galería), además de la portada de
+   * arriba — ver ProductImageEntity para el porqué de mantenerlas
+   * separadas de imageFile en vez de reemplazarlo. Se agregan/eliminan de
+   * a una (ProductsService.agregarFoto/eliminarFoto), nunca se
+   * reemplazan todas juntas. */
+  @OneToMany(() => ProductImageEntity, (foto) => foto.producto)
+  fotos!: ProductImageEntity[];
 
   /** trazabilidad: quién cargó el producto. Se setea solo al crear (ver
    * ProductsService.crearProducto), nunca se reasigna después. Es lo que

@@ -14,6 +14,7 @@ import { UserActiveInterface } from '@/common/interfaces/user-active.interface';
 import { RequestResetPasswordDto } from './dto/requestResetPassword.dto';
 import { v4 as uuidv4 } from 'uuid';
 import { UpdateUserDto } from '@/users/dto/update-user.dto';
+import { AdminUpdateUserDto } from '@/users/dto/admin-update-user.dto';
 import { ResetPasswordDto } from './dto/resetPassword.dto';
 import { getTransporter } from '@/config/mailer';
 import * as argon2 from 'argon2';
@@ -430,6 +431,23 @@ export class AuthService {
         authErrorLogger,
         'AuthService.activarUsuario',
         'Ocurrió un error al activar el usuario',
+        { id },
+      );
+    }
+  }
+
+  /** ADMIN edita a cualquier usuario — ver
+   * UsersService.actualizarUsuarioAdmin, distinto de updateUser
+   * (autoservicio, más arriba). */
+  async editarUsuarioAdmin(id: number, dto: AdminUpdateUserDto): Promise<void> {
+    try {
+      await this.usersService.actualizarUsuarioAdmin(id, dto);
+    } catch (error) {
+      handleServiceError(
+        error,
+        authErrorLogger,
+        'AuthService.editarUsuarioAdmin',
+        'Ocurrió un error al actualizar el usuario',
         { id },
       );
     }
