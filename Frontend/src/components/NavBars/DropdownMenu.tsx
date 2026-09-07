@@ -41,6 +41,7 @@ function DropdownMenu() {
 
   const links: MenuLink[] = [
     { label: 'Catálogo', path: '/' },
+    { label: 'Contacto', path: '/contacto' },
     ...(user.role === Roles.ADMIN
       ? [{ label: 'Panel de administración', path: `/${PrivateRoutes.ADMIN}` }]
       : []),

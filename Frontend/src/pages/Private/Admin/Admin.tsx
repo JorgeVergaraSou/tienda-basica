@@ -5,6 +5,7 @@ import ProductsListPage from './Products/ProductsListPage';
 import ProductFormPage from './Products/ProductFormPage';
 import CategoriesPage from './Categories/CategoriesPage';
 import UsersPage from './Users/UsersPage';
+import ContactSettingsPage from './Contact/ContactSettingsPage';
 
 const tabClass = ({ isActive }: { isActive: boolean }) =>
   `px-3 py-2 rounded-md text-sm font-medium border-b-2 transition-colors ${
@@ -23,6 +24,9 @@ const tabClass = ({ isActive }: { isActive: boolean }) =>
  * - /admin/usuarios         gestión de usuarios (UsersPage) — crear/editar
  *   en un modal (UserFormModal) en vez de una página aparte, no una ruta
  *   propia como los productos.
+ * - /admin/contacto         email/WhatsApp donde llegan los mensajes del
+ *   formulario público de contacto (ContactSettingsPage) — no es parte de
+ *   Profile.tsx, es una config del negocio, no de una cuenta personal.
  */
 function Admin() {
   return (
@@ -42,6 +46,9 @@ function Admin() {
         <NavLink to={`/${PrivateRoutes.ADMIN}/usuarios`} className={tabClass}>
           Usuarios
         </NavLink>
+        <NavLink to={`/${PrivateRoutes.ADMIN}/contacto`} className={tabClass}>
+          Contacto
+        </NavLink>
       </nav>
 
       <RoutesWithNotFound>
@@ -51,6 +58,7 @@ function Admin() {
         <Route path="productos/:id/editar" element={<ProductFormPage />} />
         <Route path="categorias" element={<CategoriesPage />} />
         <Route path="usuarios" element={<UsersPage />} />
+        <Route path="contacto" element={<ContactSettingsPage />} />
       </RoutesWithNotFound>
     </div>
   );

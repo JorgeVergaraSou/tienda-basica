@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { getCategoriesService, getProductsService } from '@/services';
 import { Category, Product } from '@/interfaces';
 import { getErrorMessage, apiOrigin } from '@/utilities';
@@ -101,7 +102,15 @@ function Catalog() {
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
-      <h1 className="text-2xl font-semibold mb-6">Catálogo</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-semibold">Catálogo</h1>
+        {/* Catalog es la home del sitio — para un visitante anónimo es el
+            único lugar del que puede salir la página de contacto, ver
+            App.tsx (Header no muestra ningún menú sin sesión). */}
+        <Link to="/contacto" className="text-blue-600 hover:underline text-sm">
+          Contacto
+        </Link>
+      </div>
 
       <form onSubmit={handleSearchSubmit} className="mb-6 flex gap-2">
         <InputBuscarProductos

@@ -307,6 +307,29 @@ backend, `GET /productos/admin/listado` ya aceptaba `page`/`limit` (máximo 50, 
 `FindProductsQueryDto`). El buscador resetea `page` a 1 al escribir una búsqueda nueva, para no
 quedar en una página que ya no existe con los resultados filtrados.
 
+**Página pública de contacto** (pedido explícito del usuario — ver `Backend/CLAUDE.md`, sección
+"Página pública de contacto", para el diseño completo incluida la decisión de WhatsApp):
+- `pages/Public/Contact/ContactPage.tsx`, nuevo — montada en `contacto` (público, sin login).
+  Deliberadamente **no** está en `models/routes.ts` → `PublicRoutes` como `LOGIN`/
+  `SERVICE_UNAVAILABLE`: ese objeto lo usa `Header.tsx` para decidir cuándo ocultar el menú privado
+  de un usuario logueado ("estás afuera de la app"), y acá un ADMIN/USER logueado tiene que poder
+  seguir viendo su navegación al visitar esta página — mismo criterio que `Catalog`/`ProductDetail`,
+  que tampoco están ahí.
+- Enlazada desde dos lugares, porque son dos audiencias con navegación distinta: un link
+  "Contacto" en el header de `Catalog.tsx` (para un visitante anónimo, que no ve ningún menú — ver
+  `Header.tsx`, no renderiza nada sin sesión) y otro en `DropdownMenu.tsx` (para cualquier usuario
+  logueado).
+- `pages/Private/Admin/Contact/ContactSettingsPage.tsx`, nuevo — quinta pestaña del panel ADMIN
+  (`admin/contacto`), el email/WhatsApp donde le llegan al negocio los mensajes. **No** vive en
+  `Profile.tsx`: es una config del negocio (puede haber varios ADMIN, ver "CRUD de usuarios para
+  ADMIN" más abajo), no de una cuenta personal — ni tiene relación con el email de *login* de nadie.
+  El input de WhatsApp aclara en el propio form que todavía no dispara notificaciones automáticas
+  (para que el ADMIN no espere un mensaje que no va a llegar).
+- `services/contact.service.ts`, nuevo (`sendContactMessageService`, `getContactSettingsService`,
+  `updateContactSettingsService`) — el de actualizar manda `email`/`whatsapp` siempre los dos, con
+  `null` si el input quedó vacío (el backend sí distingue "vaciar" de "no tocar" acá, a diferencia de
+  la mayoría de los PATCH de este proyecto).
+
 ## Arquitectura (esto sí hay que mantener con cuidado)
 
 ### Alias `@/`
@@ -455,15 +478,20 @@ src/
 │  │  ├─ ProductDetail/                (detalle público de un producto por URL directa, montada en
 │  │  │                                 'productos/:id' — sin enlazar desde la UI, ver "Historia
 │  │  │                                 reciente")
-│  │  └─ ServiceUnavailable/           (destino del interceptor de axios cuando el servidor no
-│  │                                    responde, montada en 'servicio-no-disponible' — ver
-│  │                                    "Cliente HTTP centralizado" más abajo)
+│  │  ├─ ServiceUnavailable/           (destino del interceptor de axios cuando el servidor no
+│  │  │                                 responde, montada en 'servicio-no-disponible' — ver
+│  │  │                                 "Cliente HTTP centralizado" más abajo)
+│  │  └─ Contact/ContactPage.tsx       (form público de contacto, montada en 'contacto' — NO está
+│  │                                    en PublicRoutes, ver "Historia reciente")
 │  └─ Private/
 │     ├─ Admin/Admin.tsx               (layout + tabs + sub-ruteo, solo ADMIN — ver Admin/Products/,
-│     │                                 Admin/Categories/, Admin/Users/, y "Historia reciente")
+│     │                                 Admin/Categories/, Admin/Users/, Admin/Contact/, y "Historia
+│     │                                 reciente")
 │     ├─ Admin/Products/                (ProductsListPage, ProductFormPage [crear y editar])
 │     ├─ Admin/Categories/              (CategoriesPage)
 │     ├─ Admin/Users/                   (UsersPage, UserFormModal [crear y editar, en un modal])
+│     ├─ Admin/Contact/                 (ContactSettingsPage — email/WhatsApp de contacto, no es
+│     │                                  parte de Profile.tsx)
 │     ├─ User/User.tsx                 (layout + tabs + sub-ruteo, solo USER — ver
 │     │                                 User/CargarProducto/, User/MisProductos/, y "Historia
 │     │                                 reciente")

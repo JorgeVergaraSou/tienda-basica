@@ -40,3 +40,4 @@ export const authErrorLogger = buildModuleErrorLogger('auth');
 export const usersErrorLogger = buildModuleErrorLogger('users');
 export const productsErrorLogger = buildModuleErrorLogger('products');
 export const categoriesErrorLogger = buildModuleErrorLogger('categories');
+export const contactErrorLogger = buildModuleErrorLogger('contact');

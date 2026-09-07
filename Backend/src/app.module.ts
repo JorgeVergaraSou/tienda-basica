@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { AuthModule } from './auth/auth.module';
 import { ProductsModule } from './products/products.module';
 import { CategoriesModule } from './categories/categories.module';
+import { ContactModule } from './contact/contact.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { WinstonModule } from 'nest-winston';
@@ -86,6 +87,7 @@ import * as Joi from 'joi';
     AuthModule,
     ProductsModule,
     CategoriesModule,
+    ContactModule,
   ],
   controllers: [],
   providers: [AppService],

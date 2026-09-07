@@ -218,6 +218,39 @@ da `<= 1` en ese momento, tiene que ser justo ese): `darDeBajaUsuario` (400 "No 
 protección equivalente contra editar/dar de baja tu propia cuenta desde este panel siendo el único
 ADMIN de otra forma que no sea cambiar el rol o darte de baja — ambas caen en los mismos chequeos.
 
+**Página pública de contacto** (`ContactModule`, nuevo — pedido explícito del usuario: los
+clientes tienen que poder mandarle un mensaje al negocio). Un solo módulo cubre las dos caras
+(configuración + envío):
+- `ContactSettingsEntity` (tabla `contact_settings`) es una fila **única** — `@PrimaryColumn` con
+  la PK fija en `1` (no `@PrimaryGeneratedColumn`), a propósito: nunca hay más de una config de
+  contacto, así que no tiene sentido un id autoincremental. `ContactService.getOrCrearSettings`
+  (privado) la crea con `email`/`whatsapp` en `null` la primera vez que hace falta, sin necesidad de
+  seed.
+- `PATCH /contacto/configuracion` (`@Auth(Role.ADMIN)`, `UpdateContactSettingsDto`) — el email y el
+  WhatsApp donde el negocio recibe los mensajes. **No** es parte de `UpdateUserDto`/`User` — es una
+  config del negocio, no de una cuenta personal (puede haber varios ADMIN, ver `users/`). A
+  diferencia del resto de los PATCH de este proyecto (donde omitir un campo = no tocarlo),
+  `email`/`whatsapp` aceptan `null` explícito para vaciarlos — el form de configuración del frontend
+  siempre manda los dos campos con lo que haya en los inputs, no hace falta la distinción
+  "no tocar" vs "vaciar".
+- `POST /contacto` (público, sin `@Auth`, `SendContactMessageDto`: `nombre`/`email`/`mensaje`) — le
+  manda un mail a `settings.email` reusando `getTransporter()` (`config/mailer.ts`, el mismo que ya
+  usaba `requestResetPassword` para recuperación de clave) con `replyTo: dto.email`, así el ADMIN
+  puede responderle al cliente directo desde su cliente de correo. Si todavía no hay `email`
+  configurado, `BadRequestException` con un mensaje claro (nunca falla en silencio). Throttle igual
+  que `requestResetPasswordByEmail` en `auth/` (mismo criterio: endpoint público que dispara un
+  mail, hay que limitar abuso) — 5 mensajes cada 10 min por IP. El HTML del mail escapa
+  `nombre`/`email`/`mensaje` (helper `escapeHtml` local al service) porque son datos del cliente, no
+  confiables — es el primer lugar de este proyecto que interpola datos de un usuario anónimo en un
+  mail.
+- **WhatsApp: solo se guarda el número, no se manda ninguna notificación automática todavía**
+  (pedido explícito del usuario, decisión deliberada) — no hay integración con ningún proveedor
+  (Twilio, Meta Cloud API, CallMeBot, etc.) conectada. Si en el futuro se agrega, el lugar natural es
+  adentro de `ContactService.enviarMensaje`, al lado del envío del mail, leyendo `settings.whatsapp`
+  igual que ya lee `settings.email`.
+- Logger propio (`contactErrorLogger`, `module-loggers.ts`), mismo patrón que el resto de los
+  módulos.
+
 **Identidad de login**: `nickUsuario`, no `email`, es el identificador de login — el email es
 opcional y solo queda asociado a una cuenta la primera vez que se pide recuperar la contraseña
 para esa cuenta (ver `AuthService.requestResetPassword`); una vez seteado, el flujo de reset ya no

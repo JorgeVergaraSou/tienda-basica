@@ -16,6 +16,7 @@ import GuestPage from './pages/Private/Guest/Guest'
 import Catalog from './pages/Public/Catalog/Catalog'
 import ProductDetail from './pages/Public/ProductDetail/ProductDetail'
 import ServiceUnavailable from './pages/Public/ServiceUnavailable/ServiceUnavailable'
+import ContactPage from './pages/Public/Contact/ContactPage'
 
 const Login = lazy(() => import('./pages/Login/Login'))
 const Private = lazy(() => import('./pages/Private/Private'))
@@ -38,6 +39,13 @@ function App() {
                 {/* Rutas públicas — el catálogo es la home del sitio, sin login */}
                 <Route path='/' element={<Catalog />} />
                 <Route path='productos/:id' element={<ProductDetail />} />
+                {/* NO va en PublicRoutes (a diferencia de login/servicio-no-
+                    disponible): esas ocultan el menú privado de un usuario
+                    logueado (Header.tsx las trata como "estás afuera de la
+                    app"), pero acá un ADMIN/USER logueado tiene que poder
+                    seguir viendo su navegación — mismo criterio que Catalog/
+                    ProductDetail, que tampoco están en PublicRoutes. */}
+                <Route path='contacto' element={<ContactPage />} />
                 <Route path={PublicRoutes.LOGIN} element={<Login />} />
                 {/* destino del interceptor de axios cuando no hay respuesta del
                     servidor (ver src/api/axios.ts) — pública, sin login, y sin
