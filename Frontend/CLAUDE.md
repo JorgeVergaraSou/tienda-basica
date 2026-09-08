@@ -392,6 +392,40 @@ Solo contenido real: links a Catálogo/Contacto, y el WhatsApp de contacto si es
 gris, el azul de link de siempre) — no usa los tokens `font-catalog`/`brand` del catálogo, porque
 este componente aparece también en Admin/Perfil/Login.
 
+**Listados del panel con íconos + scroll interno** (pedido explícito del usuario, en dos pasos —
+primero solo en `CategoriesPage.tsx`, sobre una captura de esa pantalla: "se ve bastante feo al
+cliente, quiero reemplazar los botones... por íconos y que la lista sea más homogénea"; después
+"replicalo" a Productos/Usuarios + "quiero que las listas no crezcan infinitamente hacia abajo,
+crea un scroll... según alto de pantalla"):
+- `components/ui/icons.tsx`, nuevo — `PencilIcon`/`BanIcon`/`CheckCircleIcon`, SVGs propios (sin
+  librería nueva), `stroke="currentColor"` para heredar el color de texto del botón que los
+  envuelve. `BanIcon`/`CheckCircleIcon` comparten la misma base (círculo) con una marca interior
+  distinta a propósito, para que el par activo/inactivo se lea como opuestos de una misma acción.
+  Cada botón-ícono lleva `title` + `aria-label` con el nombre de la fila (ej. `Editar ${nombre}`)
+  — sin texto visible, un botón sin nombre accesible es invisible para un lector de pantalla.
+- `CategoriesPage.tsx` (Categories/), `ProductsListPage.tsx` (Products/) y `UsersPage.tsx` (Users/)
+  — las tres listas del panel ADMIN, mismo tratamiento en las tres: los botones de texto
+  "Editar"/"Dar de baja"/"Reactivar" pasaron a estos íconos, y `CategoriesPage.tsx` además pasó de
+  una lista de "pills" de ancho variable (se veía irregular con muchas categorías) a una tabla —
+  mismo patrón de columnas que ya usaban `ProductsListPage.tsx`/`UsersPage.tsx`, ahora las tres
+  quedan visualmente homogéneas entre sí.
+- **Scroll interno con header sticky**: cada tabla vive en un
+  `<div className="overflow-auto max-h-[60vh]">` (antes `overflow-x-auto` nomás) — `60vh`, relativo
+  al alto de la ventana y no un píxel fijo, para que se adapte a cualquier tamaño de pantalla (pedido
+  explícito: "según alto de pantalla"). Cada `<th>` lleva `sticky top-0 z-10 bg-white` (en vez de
+  ponerlo en el `<thead>` — el soporte de `position: sticky` en `<thead>` es menos consistente entre
+  navegadores que ponerlo directo en cada celda), así el encabezado no se pierde de vista al
+  scrollear una lista larga. Verificado de verdad con una captura full-page (no solo con el viewport
+  recortado): con 11 categorías la tabla corta antes de la última fila y el footer aparece pegado
+  después, sin que la tabla haya crecido para hacerle lugar — confirma que el `overflow-auto`
+  interno realmente está limitando el alto, no es solo el borde del viewport de la captura.
+- Para verificar esto en el navegador hizo falta una sesión de ADMIN real (las páginas están detrás
+  de `AuthGuard`+`RoleGuard`) — se firmó un JWT de prueba a mano con el `SECRET_WORD` del `.env` del
+  backend y el `id_user` de un ADMIN ya existente en la base (mismo payload que arma
+  `AuthService.login`: `idUser`/`nickUsuario`/`role`/`name`), inyectado en `localStorage` vía
+  `--load-storage` de Playwright — no se creó ningún usuario nuevo ni se tocó ningún dato, y el
+  archivo con el token se borró al terminar de verificar.
+
 ## Arquitectura (esto sí hay que mantener con cuidado)
 
 ### Alias `@/`

@@ -10,10 +10,20 @@ import {
 import { Category } from '@/interfaces';
 import { getErrorMessage } from '@/utilities';
 import { showError, showSuccess } from '@/utilities/alerts/alert.utils';
-import { Button } from '@/components/ui';
+import { Button, BanIcon, CheckCircleIcon, PencilIcon } from '@/components/ui';
 
 /** Gestión de categorías — separada del resto del panel admin (antes vivía
- * en la misma página que "nuevo producto" y "listado de productos"). */
+ * en la misma página que "nuevo producto" y "listado de productos").
+ *
+ * El listado pasó de una lista de "pills" sueltas (ancho variable según
+ * el nombre, se veía desprolijo con muchas categorías — pedido explícito
+ * del usuario) a una tabla, igual criterio que ya usan
+ * ProductsListPage.tsx/UsersPage.tsx: filas parejas, mismo patrón de
+ * columnas (Nombre / Estado / Acciones) en todo el panel. Los botones de
+ * texto "Editar"/"Dar de baja"/"Reactivar" pasaron a íconos
+ * (components/ui/icons.tsx, sin librería nueva) — cada uno con
+ * `title`/`aria-label` porque, sin texto visible, un botón sin nombre
+ * accesible es invisible para un lector de pantalla. */
 function CategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(false);
@@ -121,7 +131,7 @@ function CategoriesPage() {
     <div>
       <h2 className="text-xl font-semibold mb-4">Categorías</h2>
 
-      <form onSubmit={handleSubmit} className="flex gap-2 mb-3">
+      <form onSubmit={handleSubmit} className="flex gap-2 mb-4">
         <input
           type="text"
           placeholder="Nombre de la categoría"
@@ -143,36 +153,67 @@ function CategoriesPage() {
       {loading && <p>Cargando categorías...</p>}
       {listError && <p className="text-red-600">{listError}</p>}
 
-      <ul className="flex flex-wrap gap-2">
-        {categories.map((category) => (
-          <li
-            key={category.idCategoria}
-            className={`flex items-center gap-2 border rounded-md px-3 py-1 ${
-              category.deletedAt ? 'border-red-200 text-red-600' : 'border-gray-300'
-            }`}
-          >
-            <span>{category.nombre}</span>
-            <button
-              type="button"
-              onClick={() => handleEdit(category)}
-              className="text-blue-600 underline text-sm cursor-pointer"
-            >
-              Editar
-            </button>
-            <button
-              type="button"
-              onClick={() => handleToggleActive(category)}
-              className="underline text-sm cursor-pointer"
-            >
-              {category.deletedAt ? 'Reactivar' : 'Dar de baja'}
-            </button>
-          </li>
-        ))}
-      </ul>
+      {/* max-h + overflow-y-auto: antes la tabla crecía sin límite hacia
+          abajo con muchas categorías (pedido explícito del usuario) — el
+          header queda "pegado" (sticky) arriba del scroll interno, así
+          no se pierde de vista con listas largas. 60vh relativo al alto
+          de pantalla, no un píxel fijo, para que se adapte a cualquier
+          tamaño de ventana. */}
+      <div className="overflow-auto max-h-[60vh]">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="border-b border-gray-300">
+              <th className="py-2 sticky top-0 z-10 bg-white">Nombre</th>
+              <th className="py-2 sticky top-0 z-10 bg-white">Estado</th>
+              <th className="py-2 sticky top-0 z-10 bg-white">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {categories.map((category) => (
+              <tr key={category.idCategoria} className="border-b border-gray-100">
+                <td className="py-2">{category.nombre}</td>
+                <td className="py-2">
+                  {category.deletedAt ? (
+                    <span className="text-red-600">Inactiva</span>
+                  ) : (
+                    <span className="text-green-600">Activa</span>
+                  )}
+                </td>
+                <td className="py-2">
+                  <div className="flex gap-1">
+                    <button
+                      type="button"
+                      onClick={() => handleEdit(category)}
+                      title="Editar"
+                      aria-label={`Editar ${category.nombre}`}
+                      className="p-1.5 rounded-full text-gray-500 hover:bg-blue-50 hover:text-blue-600 cursor-pointer"
+                    >
+                      <PencilIcon />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleActive(category)}
+                      title={category.deletedAt ? 'Reactivar' : 'Dar de baja'}
+                      aria-label={`${category.deletedAt ? 'Reactivar' : 'Dar de baja'} ${category.nombre}`}
+                      className={`p-1.5 rounded-full cursor-pointer ${
+                        category.deletedAt
+                          ? 'text-gray-500 hover:bg-green-50 hover:text-green-600'
+                          : 'text-gray-500 hover:bg-red-50 hover:text-red-600'
+                      }`}
+                    >
+                      {category.deletedAt ? <CheckCircleIcon /> : <BanIcon />}
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
 
-      {!loading && categories.length === 0 && (
-        <p>No hay categorías todavía — creá la primera arriba.</p>
-      )}
+        {!loading && categories.length === 0 && (
+          <p className="mt-4">No hay categorías todavía — creá la primera arriba.</p>
+        )}
+      </div>
     </div>
   );
 }

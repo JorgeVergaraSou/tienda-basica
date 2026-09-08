@@ -8,7 +8,7 @@ import {
 import { UserListItem } from '@/interfaces';
 import { getErrorMessage } from '@/utilities';
 import { showError } from '@/utilities/alerts/alert.utils';
-import { Button } from '@/components/ui';
+import { Button, BanIcon, CheckCircleIcon, PencilIcon } from '@/components/ui';
 import { UserFormModal } from './UserFormModal';
 
 /** Gestión de usuarios — ADMIN-only (RoleGuard en App.tsx + @Auth(Role.ADMIN)
@@ -104,16 +104,19 @@ function UsersPage() {
       {loading && <p>Cargando...</p>}
       {listError && <p className="text-red-600">{listError}</p>}
 
-      <div className="overflow-x-auto">
+      {/* max-h + overflow-auto: mismo criterio que CategoriesPage.tsx (ver
+          ese archivo) — no crece sin límite con muchos usuarios, header
+          sticky para no perderlo de vista al scrollear. */}
+      <div className="overflow-auto max-h-[60vh]">
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="border-b border-gray-300">
-              <th className="py-2">Usuario</th>
-              <th className="py-2">Nombre</th>
-              <th className="py-2">Email</th>
-              <th className="py-2">Rol</th>
-              <th className="py-2">Estado</th>
-              <th className="py-2">Acciones</th>
+              <th className="py-2 sticky top-0 z-10 bg-white">Usuario</th>
+              <th className="py-2 sticky top-0 z-10 bg-white">Nombre</th>
+              <th className="py-2 sticky top-0 z-10 bg-white">Email</th>
+              <th className="py-2 sticky top-0 z-10 bg-white">Rol</th>
+              <th className="py-2 sticky top-0 z-10 bg-white">Estado</th>
+              <th className="py-2 sticky top-0 z-10 bg-white">Acciones</th>
             </tr>
           </thead>
           <tbody>
@@ -133,13 +136,29 @@ function UsersPage() {
                   )}
                 </td>
                 <td className="py-2">
-                  <div className="flex gap-2">
-                    <Button variant="secondary" onClick={() => handleEditar(user)}>
-                      Editar
-                    </Button>
-                    <Button variant="secondary" onClick={() => handleToggleActive(user)}>
-                      {user.deletedAt ? 'Reactivar' : 'Dar de baja'}
-                    </Button>
+                  <div className="flex gap-1">
+                    <button
+                      type="button"
+                      onClick={() => handleEditar(user)}
+                      title="Editar"
+                      aria-label={`Editar ${user.nickUsuario}`}
+                      className="p-1.5 rounded-full text-gray-500 hover:bg-blue-50 hover:text-blue-600 cursor-pointer"
+                    >
+                      <PencilIcon />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleActive(user)}
+                      title={user.deletedAt ? 'Reactivar' : 'Dar de baja'}
+                      aria-label={`${user.deletedAt ? 'Reactivar' : 'Dar de baja'} ${user.nickUsuario}`}
+                      className={`p-1.5 rounded-full cursor-pointer ${
+                        user.deletedAt
+                          ? 'text-gray-500 hover:bg-green-50 hover:text-green-600'
+                          : 'text-gray-500 hover:bg-red-50 hover:text-red-600'
+                      }`}
+                    >
+                      {user.deletedAt ? <CheckCircleIcon /> : <BanIcon />}
+                    </button>
                   </div>
                 </td>
               </tr>

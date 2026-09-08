@@ -10,7 +10,7 @@ import { Product } from '@/interfaces';
 import { PrivateRoutes } from '@/models';
 import { getErrorMessage, apiOrigin } from '@/utilities';
 import { showError } from '@/utilities/alerts/alert.utils';
-import { Button } from '@/components/ui';
+import { Button, BanIcon, CheckCircleIcon, PencilIcon } from '@/components/ui';
 import { InputBuscarProductos } from '@/components/ProductSearch/InputBuscarProductos';
 
 // mismo criterio que Catalog.tsx: el backend ya soporta paginado por
@@ -133,17 +133,20 @@ function ProductsListPage() {
       {loading && <p>Cargando...</p>}
       {listError && <p className="text-red-600">{listError}</p>}
 
-      <div className="overflow-x-auto">
+      {/* max-h + overflow-auto: mismo criterio que CategoriesPage.tsx (ver
+          ese archivo) — no crece sin límite con muchos productos, header
+          sticky para no perderlo de vista al scrollear. */}
+      <div className="overflow-auto max-h-[60vh]">
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="border-b border-gray-300">
-              <th className="py-2">Imagen</th>
-              <th className="py-2">Nombre</th>
-              <th className="py-2">Categoría</th>
-              <th className="py-2">Precio</th>
-              <th className="py-2">Stock</th>
-              <th className="py-2">Estado</th>
-              <th className="py-2">Acciones</th>
+              <th className="py-2 sticky top-0 z-10 bg-white">Imagen</th>
+              <th className="py-2 sticky top-0 z-10 bg-white">Nombre</th>
+              <th className="py-2 sticky top-0 z-10 bg-white">Categoría</th>
+              <th className="py-2 sticky top-0 z-10 bg-white">Precio</th>
+              <th className="py-2 sticky top-0 z-10 bg-white">Stock</th>
+              <th className="py-2 sticky top-0 z-10 bg-white">Estado</th>
+              <th className="py-2 sticky top-0 z-10 bg-white">Acciones</th>
             </tr>
           </thead>
           <tbody>
@@ -176,18 +179,31 @@ function ProductsListPage() {
                   )}
                 </td>
                 <td className="py-2">
-                  <div className="flex gap-2">
-                    <Button
-                      variant="secondary"
+                  <div className="flex gap-1">
+                    <button
+                      type="button"
                       onClick={() =>
                         navigate(`/${PrivateRoutes.ADMIN}/productos/${product.idProducto}/editar`)
                       }
+                      title="Editar"
+                      aria-label={`Editar ${product.nombre}`}
+                      className="p-1.5 rounded-full text-gray-500 hover:bg-blue-50 hover:text-blue-600 cursor-pointer"
                     >
-                      Editar
-                    </Button>
-                    <Button variant="secondary" onClick={() => handleToggleActive(product)}>
-                      {product.deletedAt ? 'Reactivar' : 'Dar de baja'}
-                    </Button>
+                      <PencilIcon />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleActive(product)}
+                      title={product.deletedAt ? 'Reactivar' : 'Dar de baja'}
+                      aria-label={`${product.deletedAt ? 'Reactivar' : 'Dar de baja'} ${product.nombre}`}
+                      className={`p-1.5 rounded-full cursor-pointer ${
+                        product.deletedAt
+                          ? 'text-gray-500 hover:bg-green-50 hover:text-green-600'
+                          : 'text-gray-500 hover:bg-red-50 hover:text-red-600'
+                      }`}
+                    >
+                      {product.deletedAt ? <CheckCircleIcon /> : <BanIcon />}
+                    </button>
                   </div>
                 </td>
               </tr>
