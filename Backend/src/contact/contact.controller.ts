@@ -21,6 +21,14 @@ export class ContactController {
     return this.contactService.enviarMensaje(dto);
   }
 
+  /** público — solo el número de WhatsApp (no el email), para que
+   * ContactPage.tsx arme el link `wa.me` sin login. Ver
+   * ContactService.getWhatsappPublico. */
+  @Get('whatsapp')
+  async getWhatsapp() {
+    return this.contactService.getWhatsappPublico();
+  }
+
   /** ADMIN — email/WhatsApp donde el negocio recibe los mensajes, para
    * precargar el form de configuración del panel. */
   @Auth(Role.ADMIN)

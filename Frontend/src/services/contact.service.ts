@@ -14,6 +14,14 @@ export const sendContactMessageService = async (data: ContactMessageData): Promi
   await api.post('/contacto', data);
 };
 
+/** público — a diferencia de getContactSettingsService (ADMIN, incluye el
+ * email), esto solo da el número de WhatsApp, para armar el link `wa.me`
+ * en ContactPage.tsx sin login. */
+export const getContactWhatsappService = async (): Promise<{ whatsapp: string | null }> => {
+  const res = await api.get('/contacto/whatsapp');
+  return res.data;
+};
+
 /** ADMIN — email/WhatsApp donde el negocio recibe los mensajes de
  * contacto, para precargar el form de configuración del panel. */
 export const getContactSettingsService = async (): Promise<ContactSettings> => {

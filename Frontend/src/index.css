@@ -1,1 +1,35 @@
 @import "tailwindcss";
+
+/* Tokens del catálogo público (Catalog.tsx) — Tailwind v4 genera las
+ * utilidades solo (bg-canvas, text-brand, font-catalog, etc.) a partir de
+ * estas variables. Quedan definidas acá porque el theme de Tailwind v4 es
+ * global por naturaleza, pero solo Catalog.tsx las usa — no cambia nada
+ * en el resto de las páginas, que siguen con el font-sans/paleta de
+ * siempre. Ver Frontend/CLAUDE.md, sección "Rediseño visual del
+ * catálogo". */
+@theme {
+  --font-catalog: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+
+  --color-ink: #16233d;
+  --color-canvas: #f5f6fa;
+  --color-line: #e2e5ec;
+  --color-brand: #2454e0;
+  --color-brand-dark: #1b3fb0;
+
+  /* pills de categoría en marquesina (Catalog.tsx) — la cinta tiene el
+   * contenido duplicado x2 (ver el comentario ahí) y recorre la mitad de
+   * su propio ancho, así el loop no se nota. */
+  --animate-catalog-marquee: catalog-marquee 28s linear infinite;
+}
+
+/* se mueve de izquierda a derecha (pedido explícito del usuario): el
+ * frame inicial ya arranca corrido -50%, así que a medida que "from" pasa
+ * a "to" el contenido avanza hacia la derecha, no al revés. */
+@keyframes catalog-marquee {
+  from {
+    transform: translateX(-50%);
+  }
+  to {
+    transform: translateX(0%);
+  }
+}

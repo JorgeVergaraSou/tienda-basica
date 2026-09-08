@@ -9,6 +9,7 @@ import { ContactSettingsEntity } from './entities/contact-settings.entity';
 import { SendContactMessageDto } from './dto/send-contact-message.dto';
 import { UpdateContactSettingsDto } from './dto/update-contact-settings.dto';
 import { ContactSettingsResponseDto } from './dto/responses/contact-settings-response.dto';
+import { ContactWhatsappResponseDto } from './dto/responses/contact-whatsapp-response.dto';
 
 // singleton: nunca hay más que una fila de configuración de contacto, así
 // que la PK queda fija en vez de auto-incremental (ver
@@ -72,12 +73,32 @@ export class ContactService {
     }
   }
 
+  /** público — a diferencia de getSettings (ADMIN, email incluido), esto
+   * solo expone el número de WhatsApp, para que la página pública de
+   * contacto pueda armar el link `wa.me` sin necesitar login. Ver
+   * ContactPage.tsx en el frontend — el envío por WhatsApp en sí es
+   * 100% client-side (abre `wa.me` con el mensaje precargado, lo termina
+   * mandando el propio cliente desde su WhatsApp), no hay integración con
+   * ningún proveedor acá; esto solo le da el número al frontend. */
+  async getWhatsappPublico(): Promise<ContactWhatsappResponseDto> {
+    try {
+      const settings = await this.getOrCrearSettings();
+      return { whatsapp: settings.whatsapp };
+    } catch (error) {
+      handleServiceError(
+        error,
+        contactErrorLogger,
+        'ContactService.getWhatsappPublico',
+        'Ocurrió un error al obtener el WhatsApp de contacto',
+      );
+    }
+  }
+
   /** envía por mail el mensaje del formulario público de contacto al
-   * email configurado por el ADMIN (ver updateSettings). No manda
-   * notificación por WhatsApp todavía — se guarda el número (`whatsapp`
-   * en la configuración) pero no hay integración con ningún proveedor
-   * conectada (pedido explícito del usuario: "ninguno todavía, solo
-   * guardar el número" — ver Backend/CLAUDE.md). */
+   * email configurado por el ADMIN (ver updateSettings). No manda nada
+   * por WhatsApp — ese lado lo resuelve el frontend por su cuenta con el
+   * número que le da getWhatsappPublico (ver el comentario ahí), esta
+   * request es solo la mitad del email. */
   async enviarMensaje(dto: SendContactMessageDto): Promise<void> {
     try {
       const settings = await this.getOrCrearSettings();

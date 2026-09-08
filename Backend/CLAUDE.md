@@ -243,11 +243,16 @@ clientes tienen que poder mandarle un mensaje al negocio). Un solo módulo cubre
   `nombre`/`email`/`mensaje` (helper `escapeHtml` local al service) porque son datos del cliente, no
   confiables — es el primer lugar de este proyecto que interpola datos de un usuario anónimo en un
   mail.
-- **WhatsApp: solo se guarda el número, no se manda ninguna notificación automática todavía**
-  (pedido explícito del usuario, decisión deliberada) — no hay integración con ningún proveedor
-  (Twilio, Meta Cloud API, CallMeBot, etc.) conectada. Si en el futuro se agrega, el lugar natural es
-  adentro de `ContactService.enviarMensaje`, al lado del envío del mail, leyendo `settings.whatsapp`
-  igual que ya lee `settings.email`.
+- **WhatsApp: no hay ninguna integración de backend con ningún proveedor** (Twilio, Meta Cloud API,
+  CallMeBot, etc.) — pedido explícito del usuario, decisión deliberada. En cambio, `GET
+  /contacto/whatsapp` (público, sin `@Auth` — a propósito separado de `GET /contacto/configuracion`,
+  que sigue siendo ADMIN-only y expone el email también) solo devuelve el número guardado, para que
+  el frontend arme un link `wa.me` — mismo mecanismo (100% client-side, sin backend de por medio)
+  que ya usa este usuario en otro proyecto propio (`sweet-moment-candy/Servicios.tsx`): un
+  `window.open('https://wa.me/<numero>?text=<mensaje>')` que abre WhatsApp con el mensaje
+  precargado, lo termina enviando el propio cliente. Si en el futuro se quiere un envío realmente
+  automático (sin que el cliente tenga que confirmar nada), ahí sí hace falta un proveedor real, y el
+  lugar natural sería adentro de `ContactService.enviarMensaje`, al lado del envío del mail.
 - Logger propio (`contactErrorLogger`, `module-loggers.ts`), mismo patrón que el resto de los
   módulos.
 

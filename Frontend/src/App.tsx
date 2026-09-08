@@ -8,6 +8,7 @@ import store from './redux/store'
 import RoleGuard from './guards/rol.guard'
 import Admin from './pages/Private/Admin/Admin'
 import Header from './components/Header'
+import Footer from './components/Footer'
 import UserPage from './pages/Private/User/User'
 import ProfilePage from './pages/Private/Profile'
 import { LogoutRoute } from './components/Logout/LogoutRoute'
@@ -89,6 +90,8 @@ function App() {
                   <Route path={PrivateRoutes.LOGOUT} element={<LogoutRoute />} />
                 </Route>
               </RoutesWithNotFound>
+
+              <Footer />
             </BrowserRouter>
 
           </Provider>

@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { sendContactMessageService } from '@/services';
+import { getContactWhatsappService, sendContactMessageService } from '@/services';
 import { getErrorMessage } from '@/utilities';
 import { Button } from '@/components/ui';
 
@@ -13,16 +13,36 @@ interface ContactFormState {
 const emptyForm: ContactFormState = { nombre: '', email: '', mensaje: '' };
 
 /** Página pública de contacto — sin login (ver POST /contacto en el
- * backend, sin @Auth). El mensaje le llega al ADMIN por mail, al email
- * que haya configurado en el panel (Admin/Contact/ContactSettingsPage.tsx)
- * — si todavía no configuró ninguno, el backend responde 400 con un
- * mensaje claro en vez de fallar en silencio, y se lo mostramos tal cual
- * llega (getErrorMessage ya lo normaliza). */
+ * backend, sin @Auth). Al enviar pasan dos cosas en paralelo, igual que
+ * pidió el usuario ("que se envíe por correo y por whatsapp el
+ * mensaje"):
+ * - Mail: vía el backend, al email que haya configurado el ADMIN
+ *   (Admin/Contact/ContactSettingsPage.tsx) — si todavía no configuró
+ *   ninguno, el backend responde 400 con un mensaje claro.
+ * - WhatsApp: 100% client-side, mismo mecanismo que ya usa el usuario en
+ *   otro proyecto propio (sweet-moment-candy/Servicios.tsx) — un link
+ *   `wa.me` con el mensaje precargado, que abre una pestaña nueva. No hay
+ *   backend ni proveedor de por medio acá: lo termina enviando el propio
+ *   cliente desde su WhatsApp, nosotros solo armamos el link. */
 function ContactPage() {
   const [form, setForm] = useState<ContactFormState>(emptyForm);
+  const [whatsapp, setWhatsapp] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [formError, setFormError] = useState('');
   const [enviado, setEnviado] = useState(false);
+
+  // se pide apenas se monta la página (no recién al enviar): hace falta
+  // tenerlo ANTES del click en "Enviar" para poder abrir la ventana de
+  // WhatsApp de forma sincrónica dentro del propio handler del submit —
+  // ver el comentario en handleSubmit.
+  useEffect(() => {
+    getContactWhatsappService()
+      .then((data) => setWhatsapp(data.whatsapp))
+      .catch(() => {
+        // sin bloquear el formulario si esto falla — el mail sigue
+        // funcionando igual, WhatsApp queda como un extra opcional.
+      });
+  }, []);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -30,6 +50,21 @@ function ContactPage() {
     if (!form.nombre.trim() || !form.email.trim() || !form.mensaje.trim()) {
       setFormError('Todos los campos son obligatorios');
       return;
+    }
+
+    // Se abre ACÁ, todavía de forma sincrónica dentro del click (antes de
+    // cualquier `await`) — si esperáramos a que el mail termine de
+    // mandarse para recién ahí abrir la ventana, la mayoría de los
+    // navegadores bloquean el popup por no venir de una interacción
+    // directa del usuario. `wa.me` espera el número en dígitos, sin "+"
+    // ni espacios (por eso el replace), aunque en la configuración se
+    // haya guardado con "+" adelante.
+    if (whatsapp) {
+      const numero = whatsapp.replace(/\D/g, '');
+      const mensajeWhatsapp = encodeURIComponent(
+        `Hola, mi nombre es ${form.nombre.trim()}. ${form.mensaje.trim()}`,
+      );
+      window.open(`https://wa.me/${numero}?text=${mensajeWhatsapp}`, '_blank');
     }
 
     setEnviando(true);
@@ -102,6 +137,12 @@ function ContactPage() {
           </div>
 
           {formError && <p className="text-red-600 text-sm">{formError}</p>}
+
+          {whatsapp && (
+            <p className="text-xs text-gray-500">
+              Al enviar también se va a abrir WhatsApp con el mensaje listo para mandar.
+            </p>
+          )}
 
           <div>
             <Button type="submit" disabled={enviando}>

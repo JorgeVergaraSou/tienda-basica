@@ -323,12 +323,74 @@ quedar en una página que ya no existe con los resultados filtrados.
   (`admin/contacto`), el email/WhatsApp donde le llegan al negocio los mensajes. **No** vive en
   `Profile.tsx`: es una config del negocio (puede haber varios ADMIN, ver "CRUD de usuarios para
   ADMIN" más abajo), no de una cuenta personal — ni tiene relación con el email de *login* de nadie.
-  El input de WhatsApp aclara en el propio form que todavía no dispara notificaciones automáticas
-  (para que el ADMIN no espere un mensaje que no va a llegar).
-- `services/contact.service.ts`, nuevo (`sendContactMessageService`, `getContactSettingsService`,
-  `updateContactSettingsService`) — el de actualizar manda `email`/`whatsapp` siempre los dos, con
-  `null` si el input quedó vacío (el backend sí distingue "vaciar" de "no tocar" acá, a diferencia de
-  la mayoría de los PATCH de este proyecto).
+- `services/contact.service.ts`, nuevo (`sendContactMessageService`, `getContactWhatsappService`,
+  `getContactSettingsService`, `updateContactSettingsService`) — el de actualizar manda
+  `email`/`whatsapp` siempre los dos, con `null` si el input quedó vacío (el backend sí distingue
+  "vaciar" de "no tocar" acá, a diferencia de la mayoría de los PATCH de este proyecto).
+
+**Envío por WhatsApp al mandar el formulario** (pedido explícito del usuario, después de la página
+de contacto: "quiero que repliques este mismo sistema" — refiriéndose a
+`FRONTENDS/sweet-moment-candy/src/pages/Public/Servicios.tsx`, otro proyecto propio del mismo
+usuario, sin relación de código entre ambos). `ContactPage.tsx` pide el número apenas se monta
+(`getContactWhatsappService`, `GET /contacto/whatsapp`, público) y lo guarda en estado — hace falta
+tenerlo *antes* de que el cliente clickee "Enviar", no recién ahí, por lo que sigue. Al hacer submit,
+si hay un número cargado, se abre `window.open('https://wa.me/<numero>?text=<mensaje>')` con el
+mensaje precargado (mismo mecanismo exacto que `Servicios.tsx` — `wa.me` no es una API, es un link
+que abre WhatsApp; lo termina mandando el propio cliente) **antes** de cualquier `await` — el envío
+del mail (`sendContactMessageService`) recién se dispara después. El orden importa: si se esperara
+a que el mail termine para recién ahí abrir la ventana, la mayoría de los navegadores bloquean el
+popup por no venir de una interacción directa del usuario (el `await` "rompe" el gesto de click). El
+número se limpia con `.replace(/\D/g, '')` antes de armar el link — `wa.me` espera solo dígitos, sin
+`+` ni espacios, aunque en la configuración se haya guardado con `+` adelante.
+
+**Rediseño visual del catálogo, estilo Mercado Libre** (pedido explícito del usuario, en dos
+pasos — primero "quiero que esta página tenga un estilo visual parecido a como Mercado Libre
+muestra sus productos", después "quiero lograr algo parecido a [una captura del home de ML], no
+usar los mismos colores, sino la forma de mostrar todo"). Solo toca `Catalog.tsx` — el resto del
+sitio (Header, Admin, Profile) sigue con su paleta/tipografía de siempre:
+- `index.css` ganó tokens de Tailwind v4 (`@theme`) usados **solo** por esta página:
+  `font-catalog` (tipografía "Plus Jakarta Sans", cargada por `<link>` en `index.html` — no pisa
+  el `font-sans` global) y la paleta `ink`/`canvas`/`line`/`brand`/`brand-dark` (azul propio, no el
+  amarillo/celeste de ML — pedido explícito: "no usar los mismos colores"). Los tokens quedan
+  definidos globalmente (Tailwind v4 es así por naturaleza) pero ningún otro componente los usa.
+- Estructura de la página calcada del *ritmo* del home de ML, no de su contenido: franja de marca
+  full-bleed arriba (`bg-brand`, nombre + buscador + Contacto, siempre visible sin scrollear),
+  hero grande debajo (degradado `brand`→`brand-dark`, el único texto que afirma algo: "Bazar y
+  juguetería..."), pills de categoría, título de sección real ("Todos los productos") antes de la
+  grilla. **A propósito NO tiene** nada de lo que ML sí muestra pero acá sería inventado: badges de
+  "% OFF", "Envío gratis", cuotas — `Product` no tiene precio de oferta ni hay ninguna política de
+  envío configurada en el proyecto, mostrar eso sería mentirle a un cliente real.
+- Grilla más densa (hasta 5 columnas), cards con borde fino en reposo y sombra/borde `brand` solo
+  al hover (no sombra pareja en todas por default), precio como elemento más grande/pesado de la
+  card (en `brand`, `tabular-nums` para que alineen en columna), categoría como pill discreta
+  (sentence case, no un eyebrow en mayúsculas).
+- El `<select>` de categoría se reemplazó por pills — filtran al toque, mismo comportamiento
+  inmediato que ya tenía `handleCategoriaChange`.
+- **Pills en marquesina** (pedido explícito posterior del usuario, sobre una captura de las pills):
+  se mueven solas de izquierda a derecha (`@keyframes catalog-marquee` en `index.css`, contenido
+  duplicado x2 dentro de la cinta para que el loop no se note), salvo el botón "Todo", que queda
+  fijo afuera de la cinta. Se pausa con `hover:`/`focus-within:[animation-play-state:paused]` — si
+  no, sería imposible clickear una categoría puntual mientras se desliza. Respeta
+  `prefers-reduced-motion` (`motion-reduce:animate-none` + vuelve al scroll manual de siempre, la
+  copia decorativa se oculta con `motion-reduce:hidden` para no duplicar cada categoría en ese
+  caso). La copia duplicada lleva `aria-hidden` + `tabIndex={-1}` (`renderCategoriaPills(true)`)
+  para que un lector de pantalla o la navegación por teclado no la anuncien/tabulen dos veces.
+- Verificado visualmente con capturas (Playwright vía `npx playwright screenshot`, no hay
+  `chromium-cli` instalado en este entorno) en desktop y mobile — encontró y corrigió un bug real
+  de responsive: el buscador quedaba apretado en una sola fila con "Catálogo"/"Contacto" en mobile,
+  ahora pasa a su propia fila (`flex-wrap` + `order-*` + `basis-full` en sm).
+
+**Footer global** (pedido explícito del usuario, después de preguntar qué era el footer que veía
+en otros sitios — Western Union, Emol — y si correspondía sumarlo acá): `components/Footer.tsx`,
+nuevo, montado en `App.tsx` junto a `Header` — a diferencia de `Header`, este SÍ se muestra
+siempre, en cualquier ruta, con o sin sesión. A propósito **no** tiene nada de lo que esos
+ejemplos mostraban pero acá sería inventado: sin redes sociales (no hay ninguna cuenta configurada
+en el proyecto), sin Términos/Privacidad (esas páginas no existen, un link ahí rompería), sin
+razón social en el copyright (el proyecto no tiene un nombre de negocio definido en ningún lado).
+Solo contenido real: links a Catálogo/Contacto, y el WhatsApp de contacto si está configurado
+(mismo `getContactWhatsappService` público que ya usa `ContactPage.tsx`). Estilo neutro (blanco/
+gris, el azul de link de siempre) — no usa los tokens `font-catalog`/`brand` del catálogo, porque
+este componente aparece también en Admin/Perfil/Login.
 
 ## Arquitectura (esto sí hay que mantener con cuidado)
 
@@ -455,17 +517,29 @@ alguna vez se clona esta base de nuevo para otro proyecto.
 
 ```
 src/
+├─ index.css                           (@import "tailwindcss" + tokens propios de Catalog.tsx:
+│                                        font-catalog, ink/canvas/line/brand/brand-dark,
+│                                        @keyframes catalog-marquee — ver "Historia reciente",
+│                                        sección "Rediseño visual del catálogo")
 ├─ api/axios.ts                        (instancia axios + interceptors — no tocar sin razón)
 ├─ components/
-│  ├─ Header.tsx                       (chequea token + ruta pública)
+│  ├─ Header.tsx                       (chequea token + ruta pública — menú privado, NO el footer)
+│  ├─ Footer.tsx                       (pie de página global, se ve en toda ruta — ver "Historia
+│  │                                     reciente")
 │  ├─ Logout/Logout.tsx                (hook useLogout)
 │  ├─ NavBars/DropdownMenu.tsx         (menú real, header oscuro — ver "Historia reciente")
-│  └─ ProductSearch/InputBuscarProductos.tsx  (buscador en vivo, debounce + teclado — ver
-│                                        "Historia reciente")
+│  ├─ ProductSearch/InputBuscarProductos.tsx  (buscador en vivo, debounce + teclado — ver
+│  │                                     "Historia reciente")
+│  ├─ Profile/ProfileField.tsx         (campo editable de Profile.tsx — ver "Historia reciente",
+│  │                                     sección "Perfil rediseñado")
+│  └─ ui/                              (Button, Modal [sobre @headlessui/react], MenuToggleButton,
+│                                        SubmenuItem — barrel en ui/index.ts)
 ├─ guards/                             (AuthGuard, RoleGuard)
 ├─ hooks/useClickOutside.ts            (genérico — cierra menús/desplegables al clickear afuera)
 ├─ interfaces/                         (barrel: @/interfaces — nombres únicos; incluye
-│                                        product.interface.ts, category.interface.ts)
+│                                        product.interface.ts, category.interface.ts,
+│                                        contact.interface.ts, users.interface.ts [User +
+│                                        UserListItem])
 ├─ models/                             (Roles, PublicRoutes/PrivateRoutes, UserInfo)
 ├─ pages/
 │  ├─ Login/                           (formulario básico, sin estilar)
@@ -502,8 +576,9 @@ src/
 ├─ redux/
 │  ├─ states/user.ts                   (sesión: createUser/updateUser/resetUser + getInitialUserState)
 │  └─ store.ts
-├─ services/                           (auth, profile, products, categories — todos vía `api`,
-│                                        sin `token` param; register.service.ts sin usar)
+├─ services/                           (auth, profile, products, categories, contact, users —
+│                                        todos vía `api`, sin `token` param; register.service.ts
+│                                        sin usar)
 └─ utilities/
    ├─ apiUrl.utility.ts                (apiUrl + apiOrigin, para URLs de imágenes)
    ├─ errors/getErrorMessage.utility.ts

@@ -115,8 +115,10 @@ function ContactSettingsPage() {
             className="border border-gray-300 rounded-md px-3 py-2 w-full"
           />
           <p className="text-xs text-gray-500 mt-1">
-            Por ahora este número solo se guarda — todavía no envía notificaciones automáticas por
-            WhatsApp.
+            Cuando un cliente envía el formulario de contacto, se le abre WhatsApp con el mensaje
+            ya escrito para que lo mande él mismo — todavía no hay un envío 100% automático (sin
+            que el cliente confirme nada) porque no hay ninguna integración con un proveedor de
+            WhatsApp conectada.
           </p>
         </div>
 
