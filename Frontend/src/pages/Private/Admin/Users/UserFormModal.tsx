@@ -4,7 +4,7 @@ import { createUserService, updateUserAdminService } from '@/services';
 import { UserListItem } from '@/interfaces';
 import { Roles } from '@/models';
 import { getErrorMessage } from '@/utilities';
-import { Modal, Button } from '@/components/ui';
+import { Modal, Button, FormField, inputClass } from '@/components/ui';
 
 interface UserFormState {
   nickUsuario: string;
@@ -130,87 +130,82 @@ export function UserFormModal({ user, open, onClose, onSaved }: UserFormModalPro
   return (
     <Modal open={open} onClose={onClose} className="max-w-md">
       <div className="p-6">
-        <DialogTitle as="h2" className="text-lg font-semibold mb-4">
+        <DialogTitle as="h2" className="text-lg font-semibold text-slate-900 mb-4">
           {user ? `Editar usuario @${user.nickUsuario}` : 'Nuevo usuario'}
         </DialogTitle>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-          <div>
-            <label htmlFor="nickUsuario">Usuario</label>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <FormField label="Usuario" htmlFor="nickUsuario">
             <input
               id="nickUsuario"
               type="text"
               value={form.nickUsuario}
               onChange={(e) => setForm({ ...form, nickUsuario: e.target.value })}
-              className="border border-gray-300 rounded-md px-3 py-2 w-full"
+              className={inputClass}
             />
-          </div>
+          </FormField>
 
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label htmlFor="nombre">Nombre</label>
+            <FormField label="Nombre" htmlFor="nombre">
               <input
                 id="nombre"
                 type="text"
                 value={form.nombre}
                 onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-                className="border border-gray-300 rounded-md px-3 py-2 w-full"
+                className={inputClass}
               />
-            </div>
-            <div>
-              <label htmlFor="apellido">Apellido</label>
+            </FormField>
+            <FormField label="Apellido" htmlFor="apellido">
               <input
                 id="apellido"
                 type="text"
                 value={form.apellido}
                 onChange={(e) => setForm({ ...form, apellido: e.target.value })}
-                className="border border-gray-300 rounded-md px-3 py-2 w-full"
+                className={inputClass}
               />
-            </div>
+            </FormField>
           </div>
 
-          <div>
-            <label htmlFor="email">Email (opcional)</label>
+          <FormField label="Email (opcional)" htmlFor="email">
             <input
               id="email"
               type="email"
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
-              className="border border-gray-300 rounded-md px-3 py-2 w-full"
+              className={inputClass}
             />
-          </div>
+          </FormField>
 
-          <div>
-            <label htmlFor="role">Rol</label>
+          <FormField label="Rol" htmlFor="role">
             <select
               id="role"
               value={form.role}
               onChange={(e) => setForm({ ...form, role: e.target.value })}
-              className="border border-gray-300 rounded-md px-3 py-2 w-full"
+              className={inputClass}
             >
               <option value={Roles.ADMIN}>ADMIN</option>
               <option value={Roles.USER}>USER</option>
               <option value={Roles.GUEST}>GUEST</option>
             </select>
-          </div>
+          </FormField>
 
-          <div>
-            <label htmlFor="password">
-              {user ? 'Nueva contraseña (opcional)' : 'Contraseña'}
-            </label>
+          <FormField
+            label={user ? 'Nueva contraseña (opcional)' : 'Contraseña'}
+            htmlFor="password"
+          >
             <input
               id="password"
               type="password"
               value={form.password}
               onChange={(e) => setForm({ ...form, password: e.target.value })}
               placeholder={user ? 'Dejar en blanco para no cambiarla' : undefined}
-              className="border border-gray-300 rounded-md px-3 py-2 w-full"
+              className={inputClass}
             />
-          </div>
+          </FormField>
 
-          {formError && <p className="text-red-600 text-sm">{formError}</p>}
+          {formError && <p className="text-sm text-red-600">{formError}</p>}
 
-          <div className="flex gap-2 mt-2">
+          <div className="mt-1 flex gap-2">
             <Button type="submit" disabled={saving}>
               {saving ? 'Guardando...' : user ? 'Guardar cambios' : 'Crear usuario'}
             </Button>

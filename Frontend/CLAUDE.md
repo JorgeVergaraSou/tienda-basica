@@ -553,9 +553,17 @@ alguna vez se clona esta base de nuevo para otro proyecto.
 src/
 ├─ index.css                           (@import "tailwindcss" + tokens propios de Catalog.tsx:
 │                                        font-catalog, ink/canvas/line/brand/brand-dark,
-│                                        @keyframes catalog-marquee — ver "Historia reciente",
-│                                        sección "Rediseño visual del catálogo")
+│                                        @keyframes catalog-marquee; + font-catalog2 (Catalog2.tsx),
+│                                        font-catalog3 (Catalog3.tsx) — ver "Historia reciente",
+│                                        secciones "Rediseño visual del catálogo" y "Múltiples
+│                                        diseños de catálogo + Landing")
 ├─ api/axios.ts                        (instancia axios + interceptors — no tocar sin razón)
+├─ catalogs/                           (registro central de diseños de catálogo — catalog.types.ts
+│                                        + catalogs.config.ts, barrel en index.ts; ver "Historia
+│                                        reciente", sección "Múltiples diseños de catálogo +
+│                                        Landing". Agregar un diseño nuevo = una página en
+│                                        pages/Public/CatalogN/ + una entrada acá, nada más — ni
+│                                        Home.tsx ni App.tsx necesitan tocarse)
 ├─ components/
 │  ├─ Header.tsx                       (chequea token + ruta pública — menú privado, NO el footer)
 │  ├─ Footer.tsx                       (pie de página global, se ve en toda ruta — ver "Historia
@@ -566,8 +574,11 @@ src/
 │  │                                     "Historia reciente")
 │  ├─ Profile/ProfileField.tsx         (campo editable de Profile.tsx — ver "Historia reciente",
 │  │                                     sección "Perfil rediseñado")
-│  └─ ui/                              (Button, Modal [sobre @headlessui/react], MenuToggleButton,
-│                                        SubmenuItem — barrel en ui/index.ts)
+│  └─ ui/                              (Button, Modal [sobre @headlessui/react], FormField
+│                                        [+ inputClass/checkboxClass], PageHeader, EmptyState,
+│                                        PasswordConfirmModal, MenuToggleButton, SubmenuItem —
+│                                        barrel en ui/index.ts; los primeros 5 son el "App Shell",
+│                                        ver "Historia reciente")
 ├─ guards/                             (AuthGuard, RoleGuard)
 ├─ hooks/useClickOutside.ts            (genérico — cierra menús/desplegables al clickear afuera)
 ├─ interfaces/                         (barrel: @/interfaces — nombres únicos; incluye
@@ -580,9 +591,18 @@ src/
 │  ├─ Register/                        (SIN USAR — no hay signup público en el backend, ver
 │  │                                     "Historia reciente"; ruta sacada de App.tsx)
 │  ├─ Public/
-│  │  ├─ Catalog/                      (catálogo público — home del sitio, montada en '/'; el
+│  │  ├─ Home/Home.tsx                 (Landing — home del sitio, montada en '/'; arma las cards a
+│  │  │                                 partir de src/catalogs/, no conoce los diseños en
+│  │  │                                 particular — ver "Historia reciente")
+│  │  ├─ Catalog/                      (diseño "clásico" de catálogo, montado en '/catalog' — el
 │  │  │                                 detalle de un producto se abre en ProductDetailModal.tsx,
 │  │  │                                 no navega)
+│  │  ├─ Catalog2/                     (diseño "moderno", estilo pcfactory.cl, montado en
+│  │  │                                 '/catalog2' — mismos datos que Catalog/, reutiliza su
+│  │  │                                 ProductDetailModal.tsx; ver "Historia reciente")
+│  │  ├─ Catalog3/                     (diseño "tienda departamental", estilo paris.cl, montado en
+│  │  │                                 '/catalog3' — mismos datos, reutiliza ProductDetailModal.tsx
+│  │  │                                 de Catalog/; ver "Historia reciente")
 │  │  ├─ ProductDetail/                (detalle público de un producto por URL directa, montada en
 │  │  │                                 'productos/:id' — sin enlazar desde la UI, ver "Historia
 │  │  │                                 reciente")
@@ -619,10 +639,205 @@ src/
    └─ alerts/ (alert.utils.ts, session-alerts.utils.ts)
 ```
 
+**Empaquetado como app Android con Capacitor** (pedido explícito del usuario: probar la tienda
+como app nativa en el emulador de Android Studio, todavía **sin** pensar en publicación real —
+esa etapa queda para cuando el backend esté en un servidor con HTTPS):
+- `@capacitor/core`/`@capacitor/cli`/`@capacitor/android` (`8.5.1`, la última al momento, pide
+  `node >=22`), `capacitor.config.ts` (`appId: com.tiendabasica.tienda`, `appName: Tienda
+  Básica`, `webDir: dist`) y la carpeta `android/` (proyecto Gradle nativo generado por `npx cap
+  add android`, se versiona junto al resto — es el estándar de Capacitor, no un build artifact).
+- **URL del backend para el emulador**: `.env.mobile`, nuevo (`VITE_API_BASE_URL=http://10.0.2.2:3006/tienda/v1`)
+  — `10.0.2.2` es la dirección con la que el emulador ve al `localhost` de la PC que lo hostea;
+  `localhost` a secas desde adentro del emulador apunta al propio emulador, no al backend. Separado
+  del `.env` normal (que sigue con `localhost:3006` para `npm run dev` en el navegador) vía el
+  mecanismo de modos de Vite: `npm run build:mobile` (nuevo script, `tsc -b && vite build --mode
+  mobile`) usa `.env.mobile` en vez de `.env`. No es secreto, se versiona (a diferencia de `.env`).
+- **Cleartext HTTP solo hacia `10.0.2.2`**: Android 9+ bloquea HTTP plano por default y el backend
+  de desarrollo no tiene HTTPS. `android/app/src/main/res/xml/network_security_config.xml`, nuevo
+  — un `domain-config` que habilita `cleartextTrafficPermitted` únicamente para el dominio
+  `10.0.2.2` (no global), referenciado desde `AndroidManifest.xml`
+  (`android:networkSecurityConfig="@xml/network_security_config"` en `<application>`).
+- **Mixed Content — el segundo bloqueo, aparte del anterior**: con el `network_security_config` ya
+  andando, las llamadas seguían sin llegar — el WebView servía la app bajo `https://localhost`
+  (el `androidScheme` default de Capacitor) y bloqueaba como "Mixed Content" cualquier XHR HTTP
+  hecha desde ahí, sin importar que el cleartext estuviera permitido (son dos políticas
+  distintas). Se diagnosticó con `adb logcat` filtrando por `Capacitor/Console` (el error de
+  Mixed Content aparece ahí, no como un error de red genérico). Arreglo: `server.androidScheme:
+  'http'` en `capacitor.config.ts` — sirve la app también por HTTP, así deja de ser "mixed".
+  **Revertir a `https` (el default, sacando el bloque `server`) cuando el backend tenga HTTPS
+  real** — ver el comentario en el archivo.
+- Después de tocar `capacitor.config.ts` o `.env.mobile`: `npm run build:mobile` + `npx cap sync
+  android`, y recién ahí Run desde Android Studio (`npx cap open android` para abrirlo) — `cap
+  sync` no dispara un rebuild de Android Studio solo.
+
+**Múltiples diseños de catálogo + Landing** (pedido explícito del usuario: poder ofrecer varios
+diseños visuales del mismo catálogo, elegibles desde una página de entrada, sin duplicar la lógica
+de datos ni tocar el backend):
+- `src/catalogs/` (nuevo) — registro central (`CatalogDefinition[]`, en `catalogs.config.ts`):
+  `id`, `name`, `description`, `path` (sin slash inicial), `component` (`React.lazy`, así la
+  Landing no trae el JS de cada diseño con ella) y `previewClassName` (degradé Tailwind puramente
+  decorativo para la card de la Landing — no una captura real, así no se desactualiza si el diseño
+  cambia). **Agregar un catálogo nuevo (`Catalog3`, etc.) es una página nueva en
+  `pages/Public/Catalog3/` + una entrada acá — no hace falta tocar `Home.tsx` ni `App.tsx`.**
+- `App.tsx`: las rutas de cada diseño se generan con `catalogs.map(...)` (`<Route path={catalog.path}
+  element={<catalog.component />} />`) en vez de una `<Route>` a mano por diseño — sumar una
+  entrada al registro alcanza. `'/'` pasó de montar `Catalog` directo a montar la Landing nueva.
+- `pages/Public/Home/Home.tsx` (nuevo) — la Landing en sí: recorre `catalogs` y arma una card por
+  diseño (preview + nombre + descripción + botón "Ver catálogo" a `/${catalog.path}`). No pide
+  nada al backend, es pura navegación.
+- `pages/Public/Catalog2/Catalog2.tsx` (nuevo) — segundo diseño, inspirado visualmente en
+  pcfactory.cl (navbar oscura, acento rojo, sidebar de categorías en vez de la marquesina de pills
+  de `Catalog.tsx`, grilla más densa). Usa **exactamente** `getProductsService`/
+  `getCategoriesService` (mismo backend, mismos datos que `Catalog.tsx` — ninguna lógica de acceso
+  a datos duplicada) y reutiliza `ProductDetailModal` de `Catalog/` para el detalle en vez de
+  reimplementarlo. Tipografía propia ("Inter", token `--font-catalog2` en `index.css`, agregada
+  sin tocar los tokens de `Catalog.tsx`; fuente sumada al mismo `<link>` de Google Fonts de
+  `index.html`) — el resto de la paleta usa los colores default de Tailwind (`red-*`/`neutral-*`)
+  directo, sin tokens nuevos. A propósito **no** tiene nada que el modelo de datos no respalde
+  (specs técnicas, comparador, cuotas, carrito — no hay carrito en este proyecto): mismo criterio
+  de "no inventarle funciones a la tienda" que ya documenta `Catalog.tsx`.
+- **`Catalog.tsx` no se tocó** — se movió de `/` a `/catalog` (solo cambió dónde lo monta
+  `App.tsx`), su contenido/comportamiento quedó intacto.
+- Ajustes de navegación, por el corrimiento de `/` (antes catálogo, ahora Landing) — 3 cambios de
+  una línea, sin tocar lógica: `Footer.tsx` (el link que decía "Catálogo" ahora dice "Inicio",
+  sigue en `/` — sigue funcionando como "volver al inicio" desde cualquier página, catálogos
+  nuevos incluidos); `ContactPage.tsx`/`ProductDetail.tsx` ("← Volver al catálogo" pasa de `to="/"`
+  a `to="/catalog"` — mismo destino exacto que antes); `DropdownMenu.tsx` (nav privada de
+  ADMIN/USER: el link "Catálogo" pasa de `path: '/'` a `path: '/catalog'` — mismo destino exacto
+  que antes).
+- **Bug encontrado de paso, causado por el path nuevo**: `DropdownMenu.isActive` marcaba un link
+  como activo con `location.pathname.startsWith(path)` — con `path: '/catalog'` y una ruta real
+  `/catalog2` en el sitio, `'/catalog2'.startsWith('/catalog')` da `true`, así que el link
+  "Catálogo" se marcaba activo estando en `/catalog2`. Se corrigió a exigir coincidencia exacta o
+  que el siguiente carácter sea `/` (mismo criterio que ya tenía el caso especial de `'/'`).
+- `eslint.config.js` ganó `android` a los `ignores` (junto a `dist`) — quedó pendiente de la etapa
+  de Capacitor: `npm run lint` fallaba con cientos de errores sobre el JS empaquetado de
+  `android/app/build/`, que no es código fuente de este proyecto.
+
+**Tercer diseño de catálogo — `Catalog3.tsx`** (pedido explícito del usuario, sobre
+`https://www.paris.cl/` como referencia visual): mismo patrón que `Catalog2.tsx` — una página
+nueva en `pages/Public/Catalog3/` + una entrada en `catalogs.config.ts`, sin tocar `Home.tsx` ni
+`App.tsx` (confirma que el registro central cumple lo que promete). Montado en `/catalog3`.
+- Estética "tienda departamental": paleta rosa/fucsia (`fuchsia-*`/`pink-*` default de Tailwind,
+  sin tokens de color nuevos, mismo criterio que `Catalog2.tsx`), tipografía redondeada ("Poppins",
+  token `--font-catalog3` en `index.css`, sumada al mismo `<link>` de Google Fonts de
+  `index.html`), buscador en formato píldora, banner grande muy redondeado, y pestañas de
+  categoría con subrayado (una variante más de "un solo filtro seleccionado a la vez" — pills en
+  `Catalog.tsx`, sidebar en `Catalog2.tsx`, tabs acá). Mismos servicios
+  (`getProductsService`/`getCategoriesService`) y mismo `ProductDetailModal` reutilizado que los
+  otros dos diseños — ninguna lógica de datos duplicada. Sin nada que el modelo de datos no
+  respalde (% de descuento, cuotas, favoritos, carrito) — mismo criterio ya documentado en
+  `Catalog.tsx`/`Catalog2.tsx`.
+- Primer uso real de `@heroicons/react` en el proyecto (`MagnifyingGlassIcon`, decorativo dentro
+  del input de búsqueda) — era dependencia de la plantilla original, nunca se había usado hasta
+  ahora (mismo caso que `@headlessui/react`/`Modal.tsx` antes de `ProductDetailModal.tsx`).
+- **Gotcha de dev encontrado acá**: al agregar `@heroicons/react` como import nuevo, el ícono se
+  renderizaba gigante (cientos de px) en el dev server ya corriendo — Vite no había re-optimizado
+  la dependencia nueva en caliente. Se resolvió solo reiniciando `npm run dev`; no es un bug de
+  código. Si un ícono/dependencia nueva se ve "roto" justo después de agregarla, reiniciar el dev
+  server antes de asumir que el CSS/componente está mal.
+
+**Rediseño UI/UX completo, usando la skill `frontend-design`** (pedido explícito del usuario:
+"una verdadera revisión y mejora de diseño UI/UX", no solo cambiar colores — con la skill cargada
+como guía activa durante todo el proceso, no solo consultada de pasada). Metodología en 2 pasos:
+primero un diagnóstico completo (problemas visuales/UX, qué mantener/rediseñar, dirección
+propuesta) presentado y confirmado por el usuario **antes** de tocar código; después, la
+implementación. El diagnóstico completo (con capturas reales del estado anterior) quedó en la
+conversación, no acá — lo que sigue es el resultado.
+
+- **Dos sistemas de diseño separados, a propósito**: los 3 catálogos (`Catalog`/`Catalog2`/
+  `Catalog3`) ya tenían identidad visual propia (ver la sección anterior) y **no se tocó su
+  estructura** — solo un refinamiento acotado (ver más abajo). Lo que no tenía ningún sistema
+  real era el resto del sitio (Login, Perfil, panel Admin/User, Contacto, ProductDetail viejo,
+  ServiceUnavailable, 404): cada página repetía a mano las mismas clases de Tailwind
+  (`border-gray-300`, botones azules sin foco visible), y `Login.tsx` no tenía **ninguna** clase
+  — HTML crudo. Se le dio a todo eso un sistema propio, "App Shell":
+  - **Paleta**: `slate-900/700/50` (ya lo venían estableciendo `DropdownMenu.tsx`/`Home.tsx` como
+    el neutro del sitio, acá se formaliza) + `teal-600` como acento de acción — deliberadamente
+    **distinto** de los colores de cada catálogo (brand/red/fuchsia), para que nunca se confunda
+    "estoy en una herramienta interna" con "estoy en un catálogo". `red-600` reservado para lo
+    realmente destructivo.
+  - **Tipografía**: Inter — ya estaba cargada para `Catalog2.tsx`, se reutiliza acá seteándola
+    como `font-family` de `body` en `index.css` (no un token `font-*` nuevo: como los 3
+    catálogos ya pisan la fuente en su propio div raíz, alcanza con el default de `body`, así no
+    hizo falta tocar 14 archivos solo para la fuente).
+  - Componentes nuevos en `components/ui/` (ver el barrel `index.ts`), todos sin lógica propia
+    (reciben `value`/`onChange`/`error`/`children`, igual que ya hacía `Button.tsx`):
+    `FormField.tsx` (label + control + error/hint, + exporta `inputClass`/`checkboxClass`
+    compartidos), `PageHeader.tsx` (título + descripción + acción), `EmptyState.tsx` (reemplaza
+    los `<p>` sueltos de "no hay nada todavía"), `PasswordConfirmModal.tsx` (ver más abajo).
+    `Button.tsx`: variante `primary` pasó de azul a teal, ganó `danger` (para futuro uso —
+    destructivo de verdad, no "dar de baja" que se puede reactivar) y foco visible
+    (`focus-visible:ring-2`), que antes no tenía ninguna variante.
+  - Aplicado a las 14 páginas del "App Shell": `Login.tsx` se reconstruyó de cero (no había nada
+    que refinar); el resto (Admin: `Admin.tsx`, `ProductsListPage`, `ProductFormPage`,
+    `CategoriesPage`, `UsersPage` + `UserFormModal`, `ContactSettingsPage`; User: `User.tsx`,
+    `CargarProductoPage`, `MisProductosPage`; público: `ContactPage`, `ProductDetail`,
+    `ServiceUnavailable`, el 404 de `RoutesWithNotFound.utility.tsx`) migraron sus inputs/tablas/
+    botones a los componentes de arriba sin tocar ninguna lógica de fetch/estado/permisos.
+  - **`MisProductosPage.tsx` ganó el scroll interno + header sticky que ya tenían las otras 3
+    tablas del panel** (`ProductsListPage`/`CategoriesPage`/`UsersPage`) y no ella — inconsistencia
+    real que apareció en el diagnóstico, no solo un cambio de color.
+  - **`Profile.tsx` — el cambio más delicado**: el `Swal.fire({ input: 'password' })` que pedía
+    confirmar cada actualización se reemplazó por `PasswordConfirmModal` (propio, sobre
+    `Modal.tsx`). Mismo contrato hacia `ProfileField` (`onSave` sigue siendo `() =>
+    Promise<boolean>`) — `handleUpdate` ahora abre el modal y devuelve una promesa que se resuelve
+    recién cuando el usuario confirma (éxito) o cancela, guardada en un `ref` porque JS no tiene
+    forma nativa de "esperar" a un modal de React como si fuera un `Swal.fire` bloqueante. Un
+    error del backend (ej. contraseña incorrecta) deja el modal abierto con el error inline en vez
+    de mandar a un toast aparte, para poder reintentar sin perder el flujo. El resto de los
+    `Swal.fire` del proyecto (confirmaciones de "dar de baja", toasts de éxito/error en las otras
+    páginas) **no se tocó** — quedó fuera de alcance a propósito, ver "Alcance" más abajo.
+  - Se sacaron las etiquetas en mayúscula ("DATOS DE LA CUENTA", el header de la sidebar de
+    categorías en `Catalog2.tsx`, el tag de categoría en sus cards) — la skill `frontend-design`
+    marca el uppercase-label como uno de los tells más reconocibles de diseño genérico. Sentence
+    case en su lugar, mismo criterio que ya usaban `Catalog.tsx`/`Catalog3.tsx` sin que nadie se
+    lo señalara.
+
+- **Refinamiento acotado de los 3 catálogos** (no reescritura — `Catalog.tsx` en particular pidió
+  explícitamente no tocarse de más):
+  - `Catalog.tsx`: el hero (gradiente lineal liso) ganó una textura de puntos sutil (capa
+    `radial-gradient` decorativa aparte del degradé de marca, `aria-hidden`) — evoca la variedad
+    de un bazar sin depender de una foto ni cambiar la paleta/copy/estructura existente.
+  - `Home.tsx`: pasó de 2 cards "imagen arriba, texto abajo" (el kit de card genérico que marca
+    la skill) a láminas tipo póster — el degradé de cada diseño ocupa toda la tarjeta, con el
+    nombre superpuesto (scrim oscuro para legibilidad) en vez de vivir aparte en una franja de
+    texto. Grilla a 3 columnas (antes pensada para 2 catálogos). El CTA de cada card se probó
+    primero con una flecha `→` al final — la skill la marca explícitamente como tell genérico, se
+    sacó, queda solo el texto con subrayado al hover.
+  - `Catalog2.tsx`: la etiqueta de categoría de cada card y el título "Categorías" de la sidebar
+    pasaron de mayúscula a sentence case (ver arriba).
+  - `ProductDetailModal.tsx` (compartido por los 3 catálogos): el borde de la miniatura
+    seleccionada era `border-blue-600` fijo — coincidía por casualidad con `Catalog.tsx` pero
+    desentonaba en `Catalog2`/`Catalog3`. Pasó a `border-slate-800` (neutro, funciona en los 3
+    contextos).
+
+- **Bug real encontrado y corregido durante la Etapa 5 (revisión)**: el botón "Buscar" de
+  `Catalog2.tsx`/`Catalog3.tsx` usaba `<Button className="bg-red-600...">`/`<Button
+  className="bg-fuchsia-600...">` para pisar el color `primary` de `Button.tsx` — dependía de que
+  Tailwind generara la clase del color pisado *después* de la del variant en el CSS final (CSS
+  gana por orden de aparición cuando dos clases de igual especificidad tocan la misma propiedad).
+  Con `primary` en azul, esto por casualidad funcionaba (alfabéticamente "blue" < "red"/"fuchsia");
+  al pasar `primary` a teal ("teal" > "red"/"fuchsia") el orden se invirtió y los dos botones se
+  veían teal en vez de su color de marca — **regresión silenciosa, sin ningún error de build/lint**
+  que la delatara, solo visible en pantalla. Se corrigió sacando esos dos botones de `<Button>` y
+  escribiéndolos como `<button>` con su color completo a mano (mismo criterio que ya usan sus
+  otros botones propios, como "Ver detalle"/"Ver producto") — un color de marca fijo no debe
+  depender del orden de generación de clases de otro componente. Si en el futuro hace falta pisar
+  el color de `<Button>` por `className`, mejor no hacerlo: usar un `<button>` propio.
+
+- **Alcance — qué quedó deliberadamente afuera de esta pasada**: `pages/Private/Guest/Guest.tsx`
+  (sigue siendo contenido de ejemplo sin función real, ver el principio de este archivo —
+  rediseñarlo sería inventarle una función que no tiene); los `Swal.fire` de confirmación
+  ("¿Confirmás dar de baja...?") y de éxito/error en el resto del proyecto (solo se tocó el de
+  `Profile.tsx`, el único que pedía **datos** en vez de solo confirmar/avisar).
+
 ## Estado de las herramientas
 
 - `npm run dev` — Vite dev server.
 - `npm run build` — `tsc -b && vite build`. Limpio a la fecha de este archivo.
+- `npm run build:mobile` — build para la app Android (Capacitor), usa `.env.mobile` — ver
+  "Empaquetado como app Android con Capacitor" arriba.
 - `npm run lint` — ESLint 9, flat config (`eslint.config.js`). Limpio a la
   fecha de este archivo.
 - Sin tests configurados (no hay Jest/Vitest/Playwright instalado).

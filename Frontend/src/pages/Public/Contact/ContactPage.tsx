@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getContactWhatsappService, sendContactMessageService } from '@/services';
 import { getErrorMessage } from '@/utilities';
-import { Button } from '@/components/ui';
+import { Button, FormField, inputClass } from '@/components/ui';
 
 interface ContactFormState {
   nombre: string;
@@ -87,59 +87,62 @@ function ContactPage() {
   };
 
   return (
-    <div className="max-w-lg mx-auto px-4 py-8">
-      <Link to="/" className="text-blue-600 hover:underline text-sm">
+    <div className="mx-auto max-w-lg px-4 py-12">
+      {/* apuntaba a '/', que ahora es la Landing — el catálogo clásico
+          (de donde se llega acá normalmente) se movió a '/catalog', ver
+          App.tsx y Frontend/CLAUDE.md. */}
+      <Link to="/catalog" className="text-sm font-medium text-teal-700 hover:underline">
         ← Volver al catálogo
       </Link>
 
-      <h1 className="text-2xl font-semibold mt-4 mb-2">Contacto</h1>
-      <p className="text-gray-600 mb-6">
+      <h1 className="mt-4 mb-2 text-2xl font-semibold tracking-tight text-slate-900">Contacto</h1>
+      <p className="mb-6 text-slate-600">
         ¿Tenés una consulta? Escribinos y te respondemos a la brevedad.
       </p>
 
       {enviado ? (
-        <p className="text-green-700 bg-green-50 border border-green-200 rounded-md px-4 py-3">
+        <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-800">
           ¡Gracias! Tu mensaje se envió correctamente, te vamos a responder pronto.
         </p>
       ) : (
-        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-          <div>
-            <label htmlFor="nombre">Nombre</label>
+        <form
+          onSubmit={handleSubmit}
+          className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
+        >
+          <FormField label="Nombre" htmlFor="nombre">
             <input
               id="nombre"
               type="text"
               value={form.nombre}
               onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-              className="border border-gray-300 rounded-md px-3 py-2 w-full"
+              className={inputClass}
             />
-          </div>
+          </FormField>
 
-          <div>
-            <label htmlFor="email">Email</label>
+          <FormField label="Email" htmlFor="email">
             <input
               id="email"
               type="email"
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
-              className="border border-gray-300 rounded-md px-3 py-2 w-full"
+              className={inputClass}
             />
-          </div>
+          </FormField>
 
-          <div>
-            <label htmlFor="mensaje">Mensaje</label>
+          <FormField label="Mensaje" htmlFor="mensaje">
             <textarea
               id="mensaje"
               value={form.mensaje}
               onChange={(e) => setForm({ ...form, mensaje: e.target.value })}
               rows={5}
-              className="border border-gray-300 rounded-md px-3 py-2 w-full"
+              className={inputClass}
             />
-          </div>
+          </FormField>
 
-          {formError && <p className="text-red-600 text-sm">{formError}</p>}
+          {formError && <p className="text-sm text-red-600">{formError}</p>}
 
           {whatsapp && (
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-slate-500">
               Al enviar también se va a abrir WhatsApp con el mensaje listo para mandar.
             </p>
           )}

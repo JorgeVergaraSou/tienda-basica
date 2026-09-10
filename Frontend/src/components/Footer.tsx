@@ -39,10 +39,15 @@ function Footer() {
     <footer className="border-t border-gray-200 bg-white">
       <div className="max-w-6xl mx-auto px-4 py-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-sm text-gray-500">
         <div className="flex gap-4">
-          <Link to="/" className="hover:text-blue-600 hover:underline">
-            Catálogo
+          {/* antes decía "Catálogo" y apuntaba directo al listado — ahora
+              '/' es la Landing (elegir diseño de catálogo, ver
+              pages/Public/Home), así que este link sigue cumpliendo el
+              mismo rol de "volver al inicio" desde cualquier página
+              (incluidos los catálogos nuevos que se agreguen). */}
+          <Link to="/" className="hover:text-teal-700 hover:underline">
+            Inicio
           </Link>
-          <Link to="/contacto" className="hover:text-blue-600 hover:underline">
+          <Link to="/contacto" className="hover:text-teal-700 hover:underline">
             Contacto
           </Link>
           {whatsapp && (
@@ -50,7 +55,7 @@ function Footer() {
               href={`https://wa.me/${whatsapp.replace(/\D/g, '')}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="hover:text-blue-600 hover:underline"
+              className="hover:text-teal-700 hover:underline"
             >
               WhatsApp
             </a>

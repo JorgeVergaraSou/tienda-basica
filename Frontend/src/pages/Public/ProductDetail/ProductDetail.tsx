@@ -42,45 +42,53 @@ function ProductDetail() {
   }, [id]);
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
-      <Link to="/" className="text-blue-600 hover:underline text-sm">
+    <div className="mx-auto max-w-4xl px-4 py-12">
+      {/* apuntaba a '/', que ahora es la Landing — ver el mismo comentario
+          en ContactPage.tsx. */}
+      <Link to="/catalog" className="text-sm font-medium text-teal-700 hover:underline">
         ← Volver al catálogo
       </Link>
 
-      {loading && <p className="mt-4">Cargando...</p>}
-      {error && <p className="text-red-600 mt-4">{error}</p>}
+      {loading && <p className="mt-4 text-sm text-slate-500">Cargando...</p>}
+      {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
 
       {product && (
-        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-6">
-          <div className="h-80 bg-gray-100 rounded-md flex items-center justify-center overflow-hidden">
+        <div className="mt-4 grid grid-cols-1 gap-8 sm:grid-cols-2">
+          <div className="flex aspect-square items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
             {product.imageUrl ? (
               <img
                 src={`${apiOrigin}${product.imageUrl}`}
                 alt={product.nombre}
-                className="h-full w-full object-cover"
+                className="h-full w-full object-contain p-6"
               />
             ) : (
-              <span className="text-gray-400">Sin imagen</span>
+              <span className="text-slate-400">Sin imagen</span>
             )}
           </div>
 
           <div>
-            <h1 className="text-2xl font-semibold">{product.nombre}</h1>
-
             {product.categoria && (
-              <p className="text-sm text-gray-500 mt-1">{product.categoria.nombre}</p>
+              <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
+                {product.categoria.nombre}
+              </span>
             )}
 
-            <p className="text-2xl font-bold mt-4">{formatPrice(product.precio)}</p>
+            <h1 className="mt-3 text-2xl font-semibold tracking-tight text-slate-900">
+              {product.nombre}
+            </h1>
+
+            <p className="mt-4 text-3xl font-bold text-slate-900 tabular-nums">
+              {formatPrice(product.precio)}
+            </p>
 
             {product.stock === 0 ? (
-              <p className="text-red-600 mt-1">Sin stock</p>
+              <p className="mt-2 text-sm font-medium text-red-600">Sin stock</p>
             ) : (
-              <p className="text-gray-600 mt-1">Stock disponible: {product.stock}</p>
+              <p className="mt-2 text-sm text-slate-500">Stock disponible: {product.stock}</p>
             )}
 
             {product.descripcion && (
-              <p className="mt-4 text-gray-700 whitespace-pre-line">{product.descripcion}</p>
+              <p className="mt-4 whitespace-pre-line text-slate-700">{product.descripcion}</p>
             )}
           </div>
         </div>

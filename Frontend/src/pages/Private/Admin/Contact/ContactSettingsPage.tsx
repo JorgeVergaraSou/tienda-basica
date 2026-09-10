@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { getContactSettingsService, updateContactSettingsService } from '@/services';
 import { getErrorMessage } from '@/utilities';
 import { showSuccess } from '@/utilities/alerts/alert.utils';
-import { Button } from '@/components/ui';
+import { Button, FormField, inputClass, PageHeader } from '@/components/ui';
 
 interface SettingsFormState {
   email: string;
@@ -72,57 +72,53 @@ function ContactSettingsPage() {
   };
 
   if (loading) {
-    return <p>Cargando...</p>;
+    return <p className="text-sm text-slate-500">Cargando...</p>;
   }
 
   return (
     <div>
-      <h2 className="text-xl font-semibold mb-2">Contacto</h2>
-      <p className="text-sm text-gray-500 mb-4">
-        Acá llegan los mensajes que los clientes mandan desde la página pública de contacto.
-      </p>
+      <PageHeader
+        title="Contacto"
+        description="Acá llegan los mensajes que los clientes mandan desde la página pública de contacto."
+      />
 
-      {loadError && <p className="text-red-600 mb-4">{loadError}</p>}
+      {loadError && <p className="mb-4 text-sm text-red-600">{loadError}</p>}
 
       <form
         onSubmit={handleSubmit}
-        className="border border-gray-200 rounded-md p-4 max-w-md flex flex-col gap-3"
+        className="flex max-w-md flex-col gap-4 rounded-xl border border-slate-200 bg-white p-5"
       >
-        <div>
-          <label htmlFor="email">Email de contacto</label>
+        <FormField
+          label="Email de contacto"
+          htmlFor="email"
+          hint="Los mensajes del formulario de contacto llegan acá. Sin un email configurado, los clientes no van a poder enviar mensajes."
+        >
           <input
             id="email"
             type="email"
             value={form.email}
             onChange={(e) => setForm({ ...form, email: e.target.value })}
             placeholder="Sin configurar — el formulario público no va a funcionar"
-            className="border border-gray-300 rounded-md px-3 py-2 w-full"
+            className={inputClass}
           />
-          <p className="text-xs text-gray-500 mt-1">
-            Los mensajes del formulario de contacto llegan acá. Sin un email configurado, los
-            clientes no van a poder enviar mensajes.
-          </p>
-        </div>
+        </FormField>
 
-        <div>
-          <label htmlFor="whatsapp">WhatsApp</label>
+        <FormField
+          label="WhatsApp"
+          htmlFor="whatsapp"
+          hint="Cuando un cliente envía el formulario, se le abre WhatsApp con el mensaje ya escrito para que lo mande él mismo — todavía no hay un envío 100% automático."
+        >
           <input
             id="whatsapp"
             type="text"
             value={form.whatsapp}
             onChange={(e) => setForm({ ...form, whatsapp: e.target.value })}
             placeholder="Ej: +5491122334455"
-            className="border border-gray-300 rounded-md px-3 py-2 w-full"
+            className={inputClass}
           />
-          <p className="text-xs text-gray-500 mt-1">
-            Cuando un cliente envía el formulario de contacto, se le abre WhatsApp con el mensaje
-            ya escrito para que lo mande él mismo — todavía no hay un envío 100% automático (sin
-            que el cliente confirme nada) porque no hay ninguna integración con un proveedor de
-            WhatsApp conectada.
-          </p>
-        </div>
+        </FormField>
 
-        {formError && <p className="text-red-600 text-sm">{formError}</p>}
+        {formError && <p className="text-sm text-red-600">{formError}</p>}
 
         <div>
           <Button type="submit" disabled={saving}>

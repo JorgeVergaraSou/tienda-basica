@@ -192,9 +192,20 @@ function Catalog() {
       {/* hero — la única banda de color fuerte de la página (mismo
           criterio que el plan de diseño: "spend your boldness in one
           place"), con el único texto de marca que se anima a afirmar
-          algo: qué vende este negocio, en criollo, sin inventar ofertas. */}
-      <div className="bg-linear-to-br from-brand to-brand-dark">
-        <div className="max-w-6xl mx-auto px-4 py-10 sm:py-14">
+          algo: qué vende este negocio, en criollo, sin inventar ofertas.
+          La textura de puntos (capa decorativa, aparte del degradé de
+          marca) es lo que la diferencia de un banner-gradiente genérico —
+          evoca la variedad de un bazar sin depender de una foto. */}
+      <div className="relative overflow-hidden bg-linear-to-br from-brand to-brand-dark">
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 opacity-[0.12]"
+          style={{
+            backgroundImage: 'radial-gradient(circle, white 1.5px, transparent 1.5px)',
+            backgroundSize: '22px 22px',
+          }}
+        />
+        <div className="relative max-w-6xl mx-auto px-4 py-10 sm:py-14">
           <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight max-w-md">
             Bazar y juguetería
           </h1>

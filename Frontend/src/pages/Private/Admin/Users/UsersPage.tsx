@@ -8,7 +8,7 @@ import {
 import { UserListItem } from '@/interfaces';
 import { getErrorMessage } from '@/utilities';
 import { showError } from '@/utilities/alerts/alert.utils';
-import { Button, BanIcon, CheckCircleIcon, PencilIcon } from '@/components/ui';
+import { Button, BanIcon, CheckCircleIcon, PencilIcon, EmptyState, PageHeader } from '@/components/ui';
 import { UserFormModal } from './UserFormModal';
 
 /** Gestión de usuarios — ADMIN-only (RoleGuard en App.tsx + @Auth(Role.ADMIN)
@@ -96,53 +96,54 @@ function UsersPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-semibold">Usuarios</h2>
-        <Button onClick={handleNuevo}>+ Nuevo usuario</Button>
-      </div>
+      <PageHeader title="Usuarios" action={<Button onClick={handleNuevo}>+ Nuevo usuario</Button>} />
 
-      {loading && <p>Cargando...</p>}
-      {listError && <p className="text-red-600">{listError}</p>}
+      {loading && <p className="text-sm text-slate-500">Cargando...</p>}
+      {listError && <p className="text-sm text-red-600">{listError}</p>}
 
       {/* max-h + overflow-auto: mismo criterio que CategoriesPage.tsx (ver
           ese archivo) — no crece sin límite con muchos usuarios, header
           sticky para no perderlo de vista al scrollear. */}
-      <div className="overflow-auto max-h-[60vh]">
-        <table className="w-full text-left border-collapse">
+      <div className="overflow-auto max-h-[60vh] rounded-xl border border-slate-200 bg-white">
+        <table className="w-full text-left border-collapse text-sm">
           <thead>
-            <tr className="border-b border-gray-300">
-              <th className="py-2 sticky top-0 z-10 bg-white">Usuario</th>
-              <th className="py-2 sticky top-0 z-10 bg-white">Nombre</th>
-              <th className="py-2 sticky top-0 z-10 bg-white">Email</th>
-              <th className="py-2 sticky top-0 z-10 bg-white">Rol</th>
-              <th className="py-2 sticky top-0 z-10 bg-white">Estado</th>
-              <th className="py-2 sticky top-0 z-10 bg-white">Acciones</th>
+            <tr>
+              <th className="py-2.5 px-4 sticky top-0 z-10 bg-slate-50 font-semibold text-slate-600 border-b border-slate-200">Usuario</th>
+              <th className="py-2.5 px-4 sticky top-0 z-10 bg-slate-50 font-semibold text-slate-600 border-b border-slate-200">Nombre</th>
+              <th className="py-2.5 px-4 sticky top-0 z-10 bg-slate-50 font-semibold text-slate-600 border-b border-slate-200">Email</th>
+              <th className="py-2.5 px-4 sticky top-0 z-10 bg-slate-50 font-semibold text-slate-600 border-b border-slate-200">Rol</th>
+              <th className="py-2.5 px-4 sticky top-0 z-10 bg-slate-50 font-semibold text-slate-600 border-b border-slate-200">Estado</th>
+              <th className="py-2.5 px-4 sticky top-0 z-10 bg-slate-50 font-semibold text-slate-600 border-b border-slate-200">Acciones</th>
             </tr>
           </thead>
           <tbody>
             {users.map((user) => (
-              <tr key={user.idUser} className="border-b border-gray-100">
-                <td className="py-2">@{user.nickUsuario}</td>
-                <td className="py-2">
+              <tr key={user.idUser} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
+                <td className="py-2.5 px-4 text-slate-800">@{user.nickUsuario}</td>
+                <td className="py-2.5 px-4 text-slate-800">
                   {user.nombre} {user.apellido}
                 </td>
-                <td className="py-2">{user.email ?? '—'}</td>
-                <td className="py-2">{user.role}</td>
-                <td className="py-2">
+                <td className="py-2.5 px-4 text-slate-600">{user.email ?? '—'}</td>
+                <td className="py-2.5 px-4">
+                  <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
+                    {user.role}
+                  </span>
+                </td>
+                <td className="py-2.5 px-4">
                   {user.deletedAt ? (
-                    <span className="text-red-600">Inactivo</span>
+                    <span className="inline-flex items-center rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">Inactivo</span>
                   ) : (
-                    <span className="text-green-600">Activo</span>
+                    <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">Activo</span>
                   )}
                 </td>
-                <td className="py-2">
+                <td className="py-2.5 px-4">
                   <div className="flex gap-1">
                     <button
                       type="button"
                       onClick={() => handleEditar(user)}
                       title="Editar"
                       aria-label={`Editar ${user.nickUsuario}`}
-                      className="p-1.5 rounded-full text-gray-500 hover:bg-blue-50 hover:text-blue-600 cursor-pointer"
+                      className="p-1.5 rounded-full text-slate-500 hover:bg-teal-50 hover:text-teal-700 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600"
                     >
                       <PencilIcon />
                     </button>
@@ -151,10 +152,10 @@ function UsersPage() {
                       onClick={() => handleToggleActive(user)}
                       title={user.deletedAt ? 'Reactivar' : 'Dar de baja'}
                       aria-label={`${user.deletedAt ? 'Reactivar' : 'Dar de baja'} ${user.nickUsuario}`}
-                      className={`p-1.5 rounded-full cursor-pointer ${
+                      className={`p-1.5 rounded-full cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 ${
                         user.deletedAt
-                          ? 'text-gray-500 hover:bg-green-50 hover:text-green-600'
-                          : 'text-gray-500 hover:bg-red-50 hover:text-red-600'
+                          ? 'text-slate-500 hover:bg-emerald-50 hover:text-emerald-700'
+                          : 'text-red-400 hover:bg-red-50 hover:text-red-600'
                       }`}
                     >
                       {user.deletedAt ? <CheckCircleIcon /> : <BanIcon />}
@@ -166,7 +167,7 @@ function UsersPage() {
           </tbody>
         </table>
 
-        {!loading && users.length === 0 && <p className="mt-4">No hay usuarios para mostrar.</p>}
+        {!loading && users.length === 0 && <EmptyState message="No hay usuarios para mostrar." />}
       </div>
 
       <UserFormModal

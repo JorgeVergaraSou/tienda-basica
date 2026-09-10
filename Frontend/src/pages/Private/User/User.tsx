@@ -5,10 +5,10 @@ import CargarProductoPage from './CargarProducto/CargarProductoPage';
 import MisProductosPage from './MisProductos/MisProductosPage';
 
 const tabClass = ({ isActive }: { isActive: boolean }) =>
-  `px-3 py-2 rounded-md text-sm font-medium border-b-2 transition-colors ${
+  `px-3 py-2.5 text-sm font-medium border-b-2 transition-colors ${
     isActive
-      ? 'text-blue-700 border-blue-600'
-      : 'text-gray-600 border-transparent hover:text-blue-700 hover:border-blue-200'
+      ? 'text-teal-700 border-teal-600'
+      : 'text-slate-500 border-transparent hover:text-slate-800 hover:border-slate-300'
   }`;
 
 /** Panel del rol USER (protegido por RoleGuard en App.tsx). Layout con
@@ -22,9 +22,9 @@ const tabClass = ({ isActive }: { isActive: boolean }) =>
 function UserPage() {
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
-      <h1 className="text-2xl font-semibold mb-6">Mis productos</h1>
+      <h1 className="text-2xl font-semibold tracking-tight text-slate-900 mb-6">Mis productos</h1>
 
-      <nav className="flex gap-2 border-b border-gray-200 mb-6">
+      <nav className="flex gap-1 border-b border-slate-200 mb-6 overflow-x-auto">
         <NavLink to={`/${PrivateRoutes.USER}`} end className={tabClass}>
           Cargar producto
         </NavLink>

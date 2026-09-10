@@ -1,12 +1,23 @@
 import type { ButtonHTMLAttributes } from 'react';
 
-type ButtonVariant = 'primary' | 'secondary';
+type ButtonVariant = 'primary' | 'secondary' | 'danger';
 
 const variantClasses: Record<ButtonVariant, string> = {
+  // teal, no azul — es el acento del "App Shell" (Login/Admin/Perfil/
+  // Contacto, ver Frontend/CLAUDE.md), deliberadamente distinto de los
+  // colores propios de cada catálogo (brand/red/fuchsia) para que nunca se
+  // confunda "estoy en una herramienta interna" con "estoy en un
+  // catálogo". Los catálogos que necesitan otro color lo pisan vía
+  // `className` (ver Catalog2.tsx/Catalog3.tsx) — la cascada de Tailwind
+  // ya resolvía bien ese override antes de este cambio, sigue igual.
   primary:
-    'bg-blue-600 hover:bg-blue-700 text-white disabled:bg-blue-300',
+    'bg-teal-600 hover:bg-teal-700 text-white disabled:bg-teal-300',
   secondary:
     'bg-gray-100 hover:bg-gray-200 text-gray-800 disabled:bg-gray-50 disabled:text-gray-400',
+  // reservado para acciones destructivas de verdad (no "dar de baja" — eso
+  // se puede reactivar — sino cosas como borrar una foto sin vuelta atrás).
+  danger:
+    'bg-red-600 hover:bg-red-700 text-white disabled:bg-red-300',
 };
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -23,7 +34,7 @@ export function Button({ variant = 'primary', type = 'button', className = '', .
   return (
     <button
       type={type}
-      className={`px-4 py-2 rounded-md font-medium cursor-pointer disabled:cursor-not-allowed transition-colors ${variantClasses[variant]} ${className}`.trim()}
+      className={`px-4 py-2 rounded-md font-medium cursor-pointer disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-teal-600 ${variantClasses[variant]} ${className}`.trim()}
       {...props}
     />
   );

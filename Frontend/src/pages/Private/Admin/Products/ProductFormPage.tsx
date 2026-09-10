@@ -13,7 +13,7 @@ import { Category, Product, ProductImage } from '@/interfaces';
 import { PrivateRoutes } from '@/models';
 import { getErrorMessage, apiOrigin } from '@/utilities';
 import { showSuccess } from '@/utilities/alerts/alert.utils';
-import { Button } from '@/components/ui';
+import { Button, checkboxClass, FormField, inputClass, PageHeader } from '@/components/ui';
 
 interface ProductFormState {
   nombre: string;
@@ -208,34 +208,31 @@ function ProductFormPage() {
   );
 
   if (loading) {
-    return <p>Cargando...</p>;
+    return <p className="text-sm text-slate-500">Cargando...</p>;
   }
 
   return (
     <div>
-      <h2 className="text-xl font-semibold mb-4">
-        {editingId ? `Editar producto #${editingId}` : 'Nuevo producto'}
-      </h2>
+      <PageHeader title={editingId ? `Editar producto #${editingId}` : 'Nuevo producto'} />
 
-      <form onSubmit={handleSubmit} className="border border-gray-200 rounded-md p-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <label htmlFor="nombre">Nombre</label>
+      <form onSubmit={handleSubmit} className="rounded-xl border border-slate-200 bg-white p-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <FormField label="Nombre" htmlFor="nombre">
             <input
               id="nombre"
               type="text"
               value={form.nombre}
               onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-              className="border border-gray-300 rounded-md px-3 py-2 w-full"
+              className={inputClass}
             />
-          </div>
-          <div>
-            <label htmlFor="idCategoria">Categoría</label>
+          </FormField>
+
+          <FormField label="Categoría" htmlFor="idCategoria" error={categoriesError}>
             <select
               id="idCategoria"
               value={form.idCategoria}
               onChange={(e) => setForm({ ...form, idCategoria: e.target.value })}
-              className="border border-gray-300 rounded-md px-3 py-2 w-full"
+              className={inputClass}
             >
               <option value="">Sin categoría</option>
               {categoriasDisponibles.map((category) => (
@@ -245,10 +242,9 @@ function ProductFormPage() {
                 </option>
               ))}
             </select>
-            {categoriesError && <p className="text-red-600 text-xs mt-1">{categoriesError}</p>}
-          </div>
-          <div>
-            <label htmlFor="precio">Precio</label>
+          </FormField>
+
+          <FormField label="Precio" htmlFor="precio">
             <input
               id="precio"
               type="number"
@@ -256,45 +252,46 @@ function ProductFormPage() {
               min="0"
               value={form.precio}
               onChange={(e) => setForm({ ...form, precio: e.target.value })}
-              className="border border-gray-300 rounded-md px-3 py-2 w-full"
+              className={inputClass}
             />
-          </div>
-          <div>
-            <label htmlFor="stock">Stock</label>
+          </FormField>
+
+          <FormField label="Stock" htmlFor="stock">
             <input
               id="stock"
               type="number"
               min="0"
               value={form.stock}
               onChange={(e) => setForm({ ...form, stock: e.target.value })}
-              className="border border-gray-300 rounded-md px-3 py-2 w-full"
+              className={inputClass}
             />
-            <label className="flex items-center gap-2 mt-1 text-sm text-gray-600">
+            <label className="mt-2 flex items-center gap-2 text-sm text-slate-600">
               <input
                 type="checkbox"
                 checked={form.mostrarStock}
                 onChange={(e) => setForm({ ...form, mostrarStock: e.target.checked })}
-                className="cursor-pointer"
+                className={checkboxClass}
               />
               Mostrar stock a los clientes
             </label>
-          </div>
-          <div className="sm:col-span-2">
-            <label htmlFor="descripcion">Descripción</label>
+          </FormField>
+
+          <FormField label="Descripción" htmlFor="descripcion" className="sm:col-span-2">
             <textarea
               id="descripcion"
+              rows={4}
               value={form.descripcion}
               onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
-              className="border border-gray-300 rounded-md px-3 py-2 w-full"
+              className={inputClass}
             />
-          </div>
-          <div className="sm:col-span-2">
-            <label htmlFor="imagen">Imagen (portada)</label>
+          </FormField>
+
+          <FormField label="Imagen (portada)" htmlFor="imagen" className="sm:col-span-2">
             {currentImageUrl && (
               <img
                 src={`${apiOrigin}${currentImageUrl}`}
                 alt={form.nombre}
-                className="h-16 w-16 object-contain bg-gray-100 rounded-md mb-2"
+                className="mb-2 h-16 w-16 rounded-md border border-slate-200 bg-slate-50 object-contain"
               />
             )}
             <input
@@ -302,26 +299,26 @@ function ProductFormPage() {
               type="file"
               accept="image/jpeg,image/png,image/webp"
               onChange={(e) => setImageFile(e.target.files?.[0] ?? null)}
+              className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-teal-50 file:px-3 file:py-2 file:text-sm file:font-medium file:text-teal-700 hover:file:bg-teal-100 file:cursor-pointer cursor-pointer"
             />
-          </div>
-          <div className="sm:col-span-2">
-            <label htmlFor="fotos">Fotos adicionales (opcional, podés elegir varias)</label>
+          </FormField>
 
+          <FormField label="Fotos adicionales" hint="Opcional, podés elegir varias." htmlFor="fotos" className="sm:col-span-2">
             {currentFotos.length > 0 && (
-              <div className="flex flex-wrap gap-2 mb-2">
+              <div className="mb-2 flex flex-wrap gap-2">
                 {currentFotos.map((foto) => (
                   <div key={foto.idProductoImagen} className="relative">
                     <img
                       src={`${apiOrigin}${foto.imageUrl}`}
                       alt=""
-                      className="h-16 w-16 object-contain bg-gray-100 rounded-md"
+                      className="h-16 w-16 rounded-md border border-slate-200 bg-slate-50 object-contain"
                     />
                     <button
                       type="button"
                       onClick={() => handleDeleteFoto(foto.idProductoImagen)}
                       disabled={deletingFotoId === foto.idProductoImagen}
                       aria-label="Eliminar foto"
-                      className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center rounded-full bg-white border border-gray-300 text-red-600 text-xs leading-none cursor-pointer disabled:cursor-not-allowed"
+                      className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full border border-slate-300 bg-white text-xs leading-none text-red-600 cursor-pointer hover:bg-red-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600"
                     >
                       ×
                     </button>
@@ -336,9 +333,10 @@ function ProductFormPage() {
               multiple
               accept="image/jpeg,image/png,image/webp"
               onChange={(e) => setPhotoFiles(Array.from(e.target.files ?? []))}
+              className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-teal-50 file:px-3 file:py-2 file:text-sm file:font-medium file:text-teal-700 hover:file:bg-teal-100 file:cursor-pointer cursor-pointer"
             />
             {photoFiles.length > 0 && (
-              <ul className="mt-1 text-sm text-gray-600">
+              <ul className="mt-2 flex flex-col gap-1 text-sm text-slate-600">
                 {photoFiles.map((file, index) => (
                   <li key={`${file.name}-${index}`} className="flex items-center gap-2">
                     {file.name}
@@ -355,12 +353,12 @@ function ProductFormPage() {
                 ))}
               </ul>
             )}
-          </div>
+          </FormField>
         </div>
 
-        {formError && <p className="text-red-600 mt-2">{formError}</p>}
+        {formError && <p className="mt-3 text-sm text-red-600">{formError}</p>}
 
-        <div className="mt-4 flex gap-2">
+        <div className="mt-5 flex gap-2">
           <Button type="submit" disabled={saving}>
             {editingId ? 'Guardar cambios' : 'Crear producto'}
           </Button>

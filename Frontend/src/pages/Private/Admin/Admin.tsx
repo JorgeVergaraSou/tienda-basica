@@ -8,10 +8,10 @@ import UsersPage from './Users/UsersPage';
 import ContactSettingsPage from './Contact/ContactSettingsPage';
 
 const tabClass = ({ isActive }: { isActive: boolean }) =>
-  `px-3 py-2 rounded-md text-sm font-medium border-b-2 transition-colors ${
+  `px-3 py-2.5 text-sm font-medium border-b-2 transition-colors ${
     isActive
-      ? 'text-blue-700 border-blue-600'
-      : 'text-gray-600 border-transparent hover:text-blue-700 hover:border-blue-200'
+      ? 'text-teal-700 border-teal-600'
+      : 'text-slate-500 border-transparent hover:text-slate-800 hover:border-slate-300'
   }`;
 
 /** Panel de administración (protegido por RoleGuard ADMIN en App.tsx).
@@ -31,9 +31,11 @@ const tabClass = ({ isActive }: { isActive: boolean }) =>
 function Admin() {
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
-      <h1 className="text-2xl font-semibold mb-6">Panel de administración</h1>
+      <h1 className="text-2xl font-semibold tracking-tight text-slate-900 mb-6">
+        Panel de administración
+      </h1>
 
-      <nav className="flex gap-2 border-b border-gray-200 mb-6">
+      <nav className="flex gap-1 border-b border-slate-200 mb-6 overflow-x-auto">
         <NavLink to={`/${PrivateRoutes.ADMIN}/productos`} end className={tabClass}>
           Productos
         </NavLink>

@@ -9,11 +9,12 @@ import { apiOrigin, getErrorMessage } from '@/utilities';
 import { PublicRoutes, Roles } from '@/models';
 import { User } from '@/interfaces';
 import { ProfileField } from '@/components/Profile/ProfileField';
+import { PasswordConfirmModal } from '@/components/ui';
 
 const roleBadgeClass: Record<string, string> = {
-  [Roles.ADMIN]: 'bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200',
-  [Roles.USER]: 'bg-green-50 text-green-700 ring-1 ring-inset ring-green-200',
-  [Roles.GUEST]: 'bg-gray-50 text-gray-700 ring-1 ring-inset ring-gray-200',
+  [Roles.ADMIN]: 'bg-teal-50 text-teal-700 ring-1 ring-inset ring-teal-200',
+  [Roles.USER]: 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200',
+  [Roles.GUEST]: 'bg-slate-100 text-slate-600 ring-1 ring-inset ring-slate-200',
 };
 
 const getIniciales = (nombre: string): string => {
@@ -60,6 +61,19 @@ function ProfilePage() {
   const [subiendoFoto, setSubiendoFoto] = useState(false);
   const fotoInputRef = useRef<HTMLInputElement>(null);
 
+  // Reemplaza el Swal.fire({ input: 'password' }) que antes pedía la
+  // confirmación de contraseña — mismo contrato hacia ProfileField
+  // (onSave sigue siendo `() => Promise<boolean>`), solo cambia quién
+  // dibuja el prompt (PasswordConfirmModal, components/ui/). El resolver
+  // de la promesa se guarda en un ref porque handleUpdate necesita
+  // "esperar" a que el usuario confirme o cancele el modal antes de saber
+  // qué devolverle a ProfileField.
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false);
+  const [pendingField, setPendingField] = useState<string | null>(null);
+  const [confirmingPassword, setConfirmingPassword] = useState(false);
+  const [passwordModalError, setPasswordModalError] = useState('');
+  const resolveFieldRef = useRef<((success: boolean) => void) | null>(null);
+
   const fetchProfileData = async () => {
     try {
       const data = await profileService();
@@ -79,64 +93,76 @@ function ProfilePage() {
       .catch((error) => console.error('Error al obtener el perfil:', getErrorMessage(error)));
   }, []);
 
-  /** Devuelve si la actualización salió bien, para que ProfileField sepa
-   * si puede volver a modo lectura (ver ProfileField.onSave). */
-  const handleUpdate = async (field: string): Promise<boolean> => {
-    const fieldValidations: Record<string, { value: string; message: string }> = {
-      nickUsuario: { value: newNick, message: 'El campo nombre de usuario no puede estar vacío.' },
-      nombre: { value: newNombre, message: 'El campo nombre no puede estar vacío.' },
-      apellido: { value: newApellido, message: 'El campo apellido no puede estar vacío.' },
-      email: { value: newEmail, message: 'El campo email no puede estar vacío.' },
-      password: { value: newPassword, message: 'El campo contraseña no puede estar vacío.' },
-    };
+  // val/mensaje por campo — se usa tanto para la validación sincrónica de
+  // abajo como para armar el body del PATCH una vez confirmada la
+  // contraseña (ver handlePasswordConfirm).
+  const fieldValidations: Record<string, { value: string; message: string }> = {
+    nickUsuario: { value: newNick, message: 'El campo nombre de usuario no puede estar vacío.' },
+    nombre: { value: newNombre, message: 'El campo nombre no puede estar vacío.' },
+    apellido: { value: newApellido, message: 'El campo apellido no puede estar vacío.' },
+    email: { value: newEmail, message: 'El campo email no puede estar vacío.' },
+    password: { value: newPassword, message: 'El campo contraseña no puede estar vacío.' },
+  };
 
+  const successMessages: Record<string, string> = {
+    nickUsuario: 'El nombre de usuario se actualizó correctamente.',
+    nombre: 'El nombre se actualizó correctamente.',
+    apellido: 'El apellido se actualizó correctamente.',
+    email: 'El email se actualizó correctamente.',
+    password: 'La contraseña se actualizó correctamente.',
+  };
+
+  /** Devuelve si la actualización salió bien, para que ProfileField sepa
+   * si puede volver a modo lectura (ver ProfileField.onSave). El backend
+   * exige currentPassword en cada PATCH /auth/updateUser/:id (ver
+   * UsersService.updateUser) — se pide acá, en el momento de guardar este
+   * campo puntual, no una sola vez para toda la página. La confirmación en
+   * sí queda pendiente hasta que el usuario responda en
+   * PasswordConfirmModal (handlePasswordConfirm/handlePasswordCancel más
+   * abajo resuelven esta promesa). */
+  const handleUpdate = (field: string): Promise<boolean> => {
     if (fieldValidations[field] && fieldValidations[field].value.trim() === '') {
       Swal.fire({ icon: 'error', title: 'Error', text: fieldValidations[field].message });
-      return false;
+      return Promise.resolve(false);
     }
 
-    // el backend exige currentPassword en cada PATCH /auth/updateUser/:id
-    // (ver UsersService.updateUser) — se pide acá, en el momento de
-    // guardar este campo puntual, no una sola vez para toda la página.
-    const { value: enteredPassword } = await Swal.fire({
-      title: 'Autenticación requerida',
-      text: 'Ingresá tu contraseña para confirmar la actualización',
-      input: 'password',
-      showCancelButton: true,
-      confirmButtonText: 'Confirmar',
-      cancelButtonText: 'Cancelar',
+    setPendingField(field);
+    setPasswordModalError('');
+    setPasswordModalOpen(true);
+
+    return new Promise((resolve) => {
+      resolveFieldRef.current = resolve;
     });
+  };
 
-    if (!enteredPassword) {
-      Swal.fire({
-        icon: 'info',
-        title: 'Actualización cancelada',
-        text: 'No ingresaste tu contraseña. La operación se canceló.',
-      });
-      return false;
+  const handlePasswordCancel = () => {
+    setPasswordModalOpen(false);
+    setPendingField(null);
+    resolveFieldRef.current?.(false);
+    resolveFieldRef.current = null;
+  };
+
+  const handlePasswordConfirm = async (password: string) => {
+    if (!pendingField) return;
+
+    setConfirmingPassword(true);
+    setPasswordModalError('');
+
+    const updateData: Record<string, unknown> = { currentPassword: password };
+    if (pendingField in fieldValidations) {
+      updateData[pendingField] = fieldValidations[pendingField].value;
     }
-
-    const updateData: Record<string, unknown> = { currentPassword: enteredPassword };
-
-    if (field in fieldValidations) {
-      updateData[field] = fieldValidations[field].value;
-    }
-
-    const successMessages: Record<string, string> = {
-      nickUsuario: 'El nombre de usuario se actualizó correctamente.',
-      nombre: 'El nombre se actualizó correctamente.',
-      apellido: 'El apellido se actualizó correctamente.',
-      email: 'El email se actualizó correctamente.',
-      password: 'La contraseña se actualizó correctamente.',
-    };
 
     try {
       await updateUserService(user.idUser, updateData);
 
+      setPasswordModalOpen(false);
+      setConfirmingPassword(false);
+
       Swal.fire({
         icon: 'success',
         title: 'Actualización exitosa',
-        text: successMessages[field] ?? 'Los datos se actualizaron correctamente.',
+        text: successMessages[pendingField] ?? 'Los datos se actualizaron correctamente.',
       });
 
       await fetchProfileData();
@@ -150,10 +176,10 @@ function ProfilePage() {
       // ("¿Querés cerrar la sesión?"), que no corresponde acá: no es una
       // decisión del usuario, es una consecuencia obligada de lo que
       // acaba de hacer.
-      if (field === 'nickUsuario' || field === 'email') {
+      if (pendingField === 'nickUsuario' || pendingField === 'email') {
         await Swal.fire({
           icon: 'info',
-          title: field === 'nickUsuario' ? 'Cambio de usuario exitoso' : 'Cambio de email exitoso',
+          title: pendingField === 'nickUsuario' ? 'Cambio de usuario exitoso' : 'Cambio de email exitoso',
           text: 'Tu sesión se cerrará y deberás iniciar sesión nuevamente con tus nuevos datos.',
         });
 
@@ -167,10 +193,15 @@ function ProfilePage() {
         setNewPassword('');
       }
 
-      return true;
+      resolveFieldRef.current?.(true);
+      resolveFieldRef.current = null;
+      setPendingField(null);
     } catch (error) {
-      Swal.fire({ icon: 'error', title: 'Error', text: getErrorMessage(error) });
-      return false;
+      // se queda con el modal abierto — un 400 típico acá es "contraseña
+      // actual incorrecta", tiene más sentido dejar reintentar ahí mismo
+      // que mandar a un toast aparte y perder lo que ya había escrito.
+      setConfirmingPassword(false);
+      setPasswordModalError(getErrorMessage(error));
     }
   };
 
@@ -199,13 +230,11 @@ function ProfilePage() {
   };
 
   return (
-    <div className="flex flex-col text-center p-6">
-      <div className="grid grid-cols-1 sm:grid-cols-5 gap-4 pt-10">
-        <div className="hidden sm:block col-span-1" />
-
-        <div className="border border-gray-200 rounded-md sm:col-span-3 p-6">
+    <div className="px-4 py-12">
+      <div className="mx-auto max-w-lg">
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           {profileData && (
-            <div className="max-w-lg mx-auto">
+            <div>
               {/* Identidad */}
               <div className="flex flex-col items-center gap-3 mb-8">
                 <div className="relative">
@@ -213,10 +242,10 @@ function ProfilePage() {
                     <img
                       src={construirUrlFoto(profileData.fotoUrl)!}
                       alt="Foto de perfil"
-                      className="h-16 w-16 rounded-full object-cover ring-1 ring-inset ring-blue-200"
+                      className="h-16 w-16 rounded-full object-cover ring-1 ring-inset ring-teal-200"
                     />
                   ) : (
-                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-blue-50 text-lg font-semibold text-blue-700 ring-1 ring-inset ring-blue-200">
+                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-teal-50 text-lg font-semibold text-teal-700 ring-1 ring-inset ring-teal-200">
                       {getIniciales(`${profileData.nombre} ${profileData.apellido}`)}
                     </div>
                   )}
@@ -226,7 +255,8 @@ function ProfilePage() {
                     onClick={() => fotoInputRef.current?.click()}
                     disabled={subiendoFoto}
                     title="Cambiar foto"
-                    className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-white text-xs shadow hover:bg-blue-700 disabled:opacity-60 cursor-pointer"
+                    aria-label="Cambiar foto de perfil"
+                    className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-teal-600 text-white text-xs shadow hover:bg-teal-700 disabled:opacity-60 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-teal-600"
                   >
                     {subiendoFoto ? '…' : '✎'}
                   </button>
@@ -240,25 +270,24 @@ function ProfilePage() {
                   />
                 </div>
 
-                <div>
-                  <div className="text-lg font-semibold text-gray-900">
+                <div className="text-center">
+                  <div className="text-lg font-semibold text-slate-900">
                     {profileData.nombre} {profileData.apellido}
                   </div>
-                  <div className="text-sm text-gray-500">@{profileData.nickUsuario}</div>
+                  <div className="text-sm text-slate-500">@{profileData.nickUsuario}</div>
                 </div>
 
                 <span
                   className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
                     roleBadgeClass[user.role] ??
-                    'bg-gray-100 text-gray-700 ring-1 ring-inset ring-gray-200'
+                    'bg-slate-100 text-slate-600 ring-1 ring-inset ring-slate-200'
                   }`}
                 >
                   {user.role}
                 </span>
               </div>
 
-              {/* Datos de la cuenta */}
-              <div className="text-left text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">
+              <div className="mb-1 text-left text-sm font-semibold text-slate-700">
                 Datos de la cuenta
               </div>
               <div className="mb-6">
@@ -300,8 +329,7 @@ function ProfilePage() {
                 />
               </div>
 
-              {/* Seguridad */}
-              <div className="text-left text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">
+              <div className="mb-1 text-left text-sm font-semibold text-slate-700">
                 Seguridad
               </div>
               <div>
@@ -318,9 +346,15 @@ function ProfilePage() {
             </div>
           )}
         </div>
-
-        <div className="hidden sm:block col-span-1" />
       </div>
+
+      <PasswordConfirmModal
+        open={passwordModalOpen}
+        confirming={confirmingPassword}
+        error={passwordModalError}
+        onConfirm={handlePasswordConfirm}
+        onCancel={handlePasswordCancel}
+      />
     </div>
   );
 }

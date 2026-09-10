@@ -129,8 +129,12 @@ export function InputBuscarProductos({
             <li
               key={producto.idProducto}
               onClick={() => handleSelect(producto)}
-              className={`cursor-pointer px-4 py-2 flex items-center justify-between gap-2 hover:bg-blue-50 ${
-                selectedIndex === index ? 'bg-blue-50' : ''
+              // slate, no azul — este desplegable lo reutilizan los 3
+              // catálogos (cada uno con su propio color de marca) + el
+              // buscador del panel admin, ver ProductDetailModal.tsx para
+              // el mismo criterio.
+              className={`cursor-pointer px-4 py-2 flex items-center justify-between gap-2 hover:bg-slate-100 ${
+                selectedIndex === index ? 'bg-slate-100' : ''
               }`}
             >
               <span>

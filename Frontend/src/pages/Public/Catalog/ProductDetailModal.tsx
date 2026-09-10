@@ -92,7 +92,12 @@ export function ProductDetailModal({ product, onClose }: ProductDetailModalProps
                   type="button"
                   onClick={() => setSelectedIndex(index)}
                   className={`h-16 w-16 shrink-0 rounded-md overflow-hidden border-2 bg-gray-100 cursor-pointer ${
-                    index === selectedIndex ? 'border-blue-600' : 'border-transparent'
+                    // neutro (no un acento de marca) a propósito — este
+                    // modal lo reutilizan los 3 catálogos (Catalog/
+                    // Catalog2/Catalog3, cada uno con su propio color de
+                    // marca), así que un azul/rojo/fucsia fijo acá
+                    // desentonaría con dos de los tres.
+                    index === selectedIndex ? 'border-slate-800' : 'border-transparent'
                   }`}
                 >
                   <img src={`${apiOrigin}${foto}`} alt="" className="h-full w-full object-contain" />

@@ -1,5 +1,18 @@
 @import "tailwindcss";
 
+/* Base del "App Shell" (Login, Perfil, panel Admin/User, Contacto,
+ * ServiceUnavailable, 404, Home — ver Frontend/CLAUDE.md, sección
+ * "Sistema de diseño — App Shell"): Inter (ya se cargaba para
+ * Catalog2.tsx, se reutiliza acá en vez de sumar una fuente nueva) +
+ * fondo slate-50 como default de toda la app. Los 3 catálogos siguen
+ * intactos porque cada uno pone su propia fuente/fondo en el div raíz
+ * (font-catalog/font-catalog2/font-catalog3 + bg-canvas/bg-neutral-50/
+ * bg-white), que gana por especificidad sobre este default de `body`. */
+body {
+  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  background-color: #f8fafc;
+}
+
 /* Tokens del catálogo público (Catalog.tsx) — Tailwind v4 genera las
  * utilidades solo (bg-canvas, text-brand, font-catalog, etc.) a partir de
  * estas variables. Quedan definidas acá porque el theme de Tailwind v4 es
@@ -15,6 +28,16 @@
   --color-line: #e2e5ec;
   --color-brand: #2454e0;
   --color-brand-dark: #1b3fb0;
+
+  /* segundo diseño de catálogo (Catalog2.tsx, inspirado en pcfactory.cl) —
+   * usa la paleta neutral/red default de Tailwind directo (no necesita
+   * tokens de color propios), solo tipografía distinta a font-catalog. */
+  --font-catalog2: "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  /* tercer diseño de catálogo (Catalog3.tsx, inspirado en paris.cl) —
+   * mismo criterio que Catalog2: paleta pink/fuchsia default de Tailwind
+   * directo, solo tipografía propia. */
+  --font-catalog3: "Poppins", ui-sans-serif, system-ui, sans-serif;
 
   /* pills de categoría en marquesina (Catalog.tsx) — la cinta tiene el
    * contenido duplicado x2 (ver el comentario ahí) y recorre la mitad de

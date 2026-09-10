@@ -13,7 +13,7 @@
  * acá, para no depender de CSS que este proyecto no tiene.
  */
 import { useState } from 'react';
-import { Button } from '@/components/ui';
+import { Button, inputClass } from '@/components/ui';
 
 interface ProfileFieldProps {
   label: string;
@@ -58,18 +58,16 @@ export function ProfileField({
 
   if (!editando) {
     return (
-      <div className="flex items-center gap-4 border-b border-gray-200 py-3 last:border-0">
+      <div className="flex items-center gap-4 border-b border-slate-100 py-3 last:border-0">
         <div className="text-left flex-1">
-          <div className="text-xs font-medium uppercase tracking-wide text-gray-400">
-            {label}
-          </div>
-          <div className="text-sm text-gray-900">{currentValue}</div>
+          <div className="text-xs font-medium text-slate-400">{label}</div>
+          <div className="text-sm text-slate-900">{currentValue}</div>
         </div>
 
         <button
           type="button"
           onClick={() => setEditando(true)}
-          className="text-sm font-medium text-blue-600 hover:underline cursor-pointer"
+          className="text-sm font-medium text-teal-700 hover:underline cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 rounded"
         >
           Editar
         </button>
@@ -78,10 +76,8 @@ export function ProfileField({
   }
 
   return (
-    <div className="border-b border-gray-200 py-3 last:border-0">
-      <div className="text-left text-xs font-medium uppercase tracking-wide text-gray-400 mb-2">
-        {label}
-      </div>
+    <div className="border-b border-slate-100 py-3 last:border-0">
+      <div className="mb-2 text-left text-xs font-medium text-slate-400">{label}</div>
 
       <div className="flex flex-col sm:flex-row gap-2">
         <input
@@ -89,7 +85,7 @@ export function ProfileField({
           value={value}
           placeholder={placeholder}
           onChange={(e) => onChange(e.target.value)}
-          className="border border-gray-300 rounded-md px-3 py-2 flex-1"
+          className={`${inputClass} flex-1`}
           autoFocus
         />
 

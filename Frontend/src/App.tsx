@@ -14,10 +14,11 @@ import ProfilePage from './pages/Private/Profile'
 import { LogoutRoute } from './components/Logout/LogoutRoute'
 import RoutesWithNotFound from './utilities/RoutesWithNotFound.utility'
 import GuestPage from './pages/Private/Guest/Guest'
-import Catalog from './pages/Public/Catalog/Catalog'
+import Home from './pages/Public/Home/Home'
 import ProductDetail from './pages/Public/ProductDetail/ProductDetail'
 import ServiceUnavailable from './pages/Public/ServiceUnavailable/ServiceUnavailable'
 import ContactPage from './pages/Public/Contact/ContactPage'
+import { catalogs } from './catalogs'
 
 const Login = lazy(() => import('./pages/Login/Login'))
 const Private = lazy(() => import('./pages/Private/Private'))
@@ -37,8 +38,16 @@ function App() {
 
               <RoutesWithNotFound>
 
-                {/* Rutas públicas — el catálogo es la home del sitio, sin login */}
-                <Route path='/' element={<Catalog />} />
+                {/* Rutas públicas — la Landing (elegir diseño de catálogo)
+                    es la home del sitio, sin login. Cada diseño se monta
+                    en su propia ruta a partir del registro central (ver
+                    src/catalogs/catalogs.config.ts) — agregar un catálogo
+                    nuevo no requiere tocar este archivo, solo sumar una
+                    entrada ahí. */}
+                <Route path='/' element={<Home />} />
+                {catalogs.map((catalog) => (
+                  <Route key={catalog.id} path={catalog.path} element={<catalog.component />} />
+                ))}
                 <Route path='productos/:id' element={<ProductDetail />} />
                 {/* NO va en PublicRoutes (a diferencia de login/servicio-no-
                     disponible): esas ocultan el menú privado de un usuario

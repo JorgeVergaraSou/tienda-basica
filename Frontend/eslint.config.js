@@ -6,7 +6,11 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh';
 
 export default [
-  { ignores: ['dist'] },
+  // 'android': proyecto nativo de Capacitor (ver capacitor.config.ts) —
+  // trae JS de build/dependencias empaquetado (android/app/build/,
+  // android/app/src/main/assets/public/ es el dist/ copiado por `cap
+  // sync`), no es código fuente de este proyecto.
+  { ignores: ['dist', 'android'] },
   js.configs.recommended,
   ...tsPlugin.configs['flat/recommended'],
   {

@@ -53,10 +53,6 @@ dos compilan a `dist/` en paralelo y se pisan (`MODULE_NOT_FOUND` / `EADDRINUSE`
 Si necesitás un build limpio con el watcher activo, primero matá el proceso de `start:dev` (o
 dejá que su propia recompilación incremental valide el cambio) y recién ahí corré `build`.
 
-No hay un repo `.git` local inicializado en este directorio de trabajo todavía, aunque existe un
-workflow de GitHub Actions — verificá esto antes de asumir que hay historial de git o branching
-disponible.
-
 ## Variables de entorno
 
 La configuración se valida de entrada al bootear, con un schema de Joi en

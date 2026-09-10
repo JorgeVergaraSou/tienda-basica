@@ -15,13 +15,15 @@ function ServiceUnavailable() {
   const navigate = useNavigate();
 
   return (
-    <div className="max-w-md mx-auto px-4 py-16 text-center">
-      <h1 className="text-2xl font-semibold mb-2">Servicio no disponible</h1>
-      <p className="text-gray-600 mb-6">
+    <div className="mx-auto max-w-md px-4 py-24 text-center">
+      <h1 className="mb-2 text-2xl font-semibold tracking-tight text-slate-900">
+        Servicio no disponible
+      </h1>
+      <p className="mb-6 text-slate-600">
         No pudimos conectarnos con el servidor. Puede ser algo temporal — probá de nuevo en unos
         minutos.
       </p>
-      <Button onClick={() => navigate('/')}>Volver al catálogo</Button>
+      <Button onClick={() => navigate('/')}>Volver al inicio</Button>
     </div>
   );
 }

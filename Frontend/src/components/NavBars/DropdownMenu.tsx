@@ -14,14 +14,14 @@ interface MenuLink {
 
 // Header oscuro (slate-800) a propósito, para separarse claramente del
 // catálogo y el resto de las páginas (fondo claro). El link de la página
-// actual se marca con un borde inferior celeste, aunque no se esté con el
-// mouse encima — mismo criterio de "dónde estoy parado" que un navbar de
-// e-commerce típico.
+// actual se marca con un borde inferior teal (acento del "App Shell", ver
+// Frontend/CLAUDE.md), aunque no se esté con el mouse encima — mismo
+// criterio de "dónde estoy parado" que un navbar de e-commerce típico.
 const linkBaseClass =
   'px-3 py-2 rounded-md text-sm font-medium cursor-pointer focus:outline-none transition-colors border-b-2';
 const linkInactiveClass =
   'text-slate-200 hover:bg-white/10 hover:text-white border-transparent';
-const linkActiveClass = 'text-white border-blue-400';
+const linkActiveClass = 'text-white border-teal-400';
 // "Cerrar sesión" no es una página más — se distingue con un tono rojizo
 // para que no se confunda con el resto de la navegación.
 const logoutClass =
@@ -40,7 +40,10 @@ function DropdownMenu() {
   const logOut = useLogout();
 
   const links: MenuLink[] = [
-    { label: 'Catálogo', path: '/' },
+    // apuntaba a '/', que ahora es la Landing (elegir diseño de catálogo,
+    // ver pages/Public/Home) — este link sigue yendo directo al catálogo
+    // clásico, mismo comportamiento de siempre para ADMIN/USER logueados.
+    { label: 'Catálogo', path: '/catalog' },
     { label: 'Contacto', path: '/contacto' },
     ...(user.role === Roles.ADMIN
       ? [{ label: 'Panel de administración', path: `/${PrivateRoutes.ADMIN}` }]
@@ -65,8 +68,17 @@ function DropdownMenu() {
   const cerrarMenu = useCallback(() => setIsOpen(false), []);
   useClickOutside(menuRef, cerrarMenu);
 
+  // startsWith(path) a secas se rompía con el path nuevo '/catalog': un
+  // ADMIN/USER en '/catalog2' (otro diseño de catálogo, ver
+  // src/catalogs/) marcaba este link como activo por error, porque
+  // '/catalog2'.startsWith('/catalog') da true. Exige coincidencia exacta
+  // o el siguiente segmento sea '/', para no confundir rutas hermanas que
+  // comparten prefijo (mismo motivo por el que '/' ya tenía su propio
+  // caso especial).
   const isActive = (path: string) =>
-    path === '/' ? location.pathname === '/' : location.pathname.startsWith(path);
+    path === '/'
+      ? location.pathname === '/'
+      : location.pathname === path || location.pathname.startsWith(`${path}/`);
 
   const linkClass = (link: MenuLink) => {
     if (link.isAction) {
@@ -109,7 +121,7 @@ function DropdownMenu() {
         <button
           type="button"
           onClick={() => setIsOpen(!isOpen)}
-          className="md:hidden bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium"
+          className="md:hidden bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-md text-sm font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-teal-400"
         >
           Menu
         </button>
