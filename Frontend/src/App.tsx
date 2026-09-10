@@ -46,7 +46,11 @@ function App() {
                     entrada ahí. */}
                 <Route path='/' element={<Home />} />
                 {catalogs.map((catalog) => (
-                  <Route key={catalog.id} path={catalog.path} element={<catalog.component />} />
+                  <Route
+                    key={catalog.id}
+                    path={catalog.hasSubRoutes ? `${catalog.path}/*` : catalog.path}
+                    element={<catalog.component />}
+                  />
                 ))}
                 <Route path='productos/:id' element={<ProductDetail />} />
                 {/* NO va en PublicRoutes (a diferencia de login/servicio-no-

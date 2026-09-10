@@ -554,7 +554,10 @@ src/
 ├─ index.css                           (@import "tailwindcss" + tokens propios de Catalog.tsx:
 │                                        font-catalog, ink/canvas/line/brand/brand-dark,
 │                                        @keyframes catalog-marquee; + font-catalog2 (Catalog2.tsx),
-│                                        font-catalog3 (Catalog3.tsx) — ver "Historia reciente",
+│                                        font-catalog3 (Catalog3.tsx), font-catalog4-display +
+│                                        --color-c4-* (Catalog4.tsx), font-catalog5 + --color-c5-*
+│                                        (Catalog5.tsx), font-catalog6 + --color-c6-* (Catalog6.tsx)
+│                                        — ver "Historia reciente",
 │                                        secciones "Rediseño visual del catálogo" y "Múltiples
 │                                        diseños de catálogo + Landing")
 ├─ api/axios.ts                        (instancia axios + interceptors — no tocar sin razón)
@@ -603,6 +606,25 @@ src/
 │  │  ├─ Catalog3/                     (diseño "tienda departamental", estilo paris.cl, montado en
 │  │  │                                 '/catalog3' — mismos datos, reutiliza ProductDetailModal.tsx
 │  │  │                                 de Catalog/; ver "Historia reciente")
+│  │  ├─ Catalog4/                     (diseño "vidriera boutique", editorial/serif, montado en
+│  │  │                                 '/catalog4' — mismos datos, reutiliza ProductDetailModal.tsx
+│  │  │                                 de Catalog/; ver "Historia reciente")
+│  │  ├─ Catalog5/                     (diseño "galería" oscuro/dorado, carrusel de productos,
+│  │  │                                 montado en '/catalog5' con sub-ruteo propio —
+│  │  │                                 Catalog5.tsx [shell], CatalogoCarrusel.tsx [listado],
+│  │  │                                 DetalleProducto.tsx [página de detalle, NO modal, en
+│  │  │                                 'detalleproducto/:id']; único catálogo con
+│  │  │                                 hasSubRoutes: true — ver "Historia reciente")
+│  │  ├─ Catalog6/                     (landing densa "tienda por departamentos", montada en
+│  │  │                                 '/catalog6' — Catalog6.tsx [página], HeroCarousel.tsx,
+│  │  │                                 CategoryDrawer.tsx, ProductCarousel.tsx, ProductCard.tsx
+│  │  │                                 [reutilizable]; datos reales, reutiliza
+│  │  │                                 ProductDetailModal.tsx de Catalog/ — ver "Historia reciente")
+│  │  ├─ Catalog7/                     (grilla técnica densa, acento índigo, montada en
+│  │  │                                 '/catalog7' — Catalog7.tsx [página], ProductCard.tsx
+│  │  │                                 [+ ProductCardSkeleton, reutilizables]; único catálogo sin
+│  │  │                                 tokens propios en index.css (usa la tipografía del sistema
+│  │  │                                 a propósito) — ver "Historia reciente")
 │  │  ├─ ProductDetail/                (detalle público de un producto por URL directa, montada en
 │  │  │                                 'productos/:id' — sin enlazar desde la UI, ver "Historia
 │  │  │                                 reciente")
@@ -831,6 +853,161 @@ conversación, no acá — lo que sigue es el resultado.
   rediseñarlo sería inventarle una función que no tiene); los `Swal.fire` de confirmación
   ("¿Confirmás dar de baja...?") y de éxito/error en el resto del proyecto (solo se tocó el de
   `Profile.tsx`, el único que pedía **datos** en vez de solo confirmar/avisar).
+
+**Cuarto diseño de catálogo — `Catalog4.tsx`** (pedido explícito del usuario, con la skill
+`frontend-design` como guía activa — ver esa skill en `~/.claude/skills/frontend-design/`). Mismo
+patrón de siempre: página nueva en `pages/Public/Catalog4/` + una entrada en
+`catalogs.config.ts`, sin tocar `Home.tsx` ni `App.tsx`. Montado en `/catalog4`.
+- Identidad "vidriera boutique" — la que ninguno de los otros 3 cubría (marketplace clásico,
+  técnico denso, tienda departamental colorida): casi blanco + tinta + verde esmeralda (paleta
+  propia nueva, `--color-c4-*` en `index.css` — a diferencia de Catalog2/Catalog3, que reusan la
+  paleta default de Tailwind, acá hizo falta un tono de verde que Tailwind no tiene tal cual),
+  serif con carácter (**Fraunces**, agregada al mismo `<link>` de Google Fonts) **solo** para
+  títulos/nombres de producto — el cuerpo usa el sans del sistema, no se sumó una segunda fuente
+  nueva. Sin banner-degradé (apertura editorial: título + párrafo, sin bloque de color), sin
+  cards redondeadas ni con sombra (separadas por aire + una imagen en `aspect-[4/5]`, no
+  cuadrada), filtro de categoría como lista de texto con la activa en itálica (pill en
+  `Catalog.tsx`, sidebar en `Catalog2.tsx`, pestañas subrayadas en `Catalog3.tsx` — esta es la
+  cuarta variante distinta del mismo patrón "un filtro seleccionado a la vez"). Mismos servicios
+  (`getProductsService`/`getCategoriesService`) y mismo `ProductDetailModal` reutilizado — sin
+  carrito (este proyecto no tiene checkout en ningún lado) ni badges de descuento/cuotas
+  inventados, mismo criterio que los otros 3.
+- Cada card es un único `<button>` (imagen + nombre + precio + "Ver detalle" adentro) — la
+  primera versión tenía dos botones apilados haciendo exactamente lo mismo (una redundancia real
+  para navegación por teclado/lector de pantalla), se corrigió antes de terminar la pasada.
+- El buscador (`InputBuscarProductos`, reutilizado) se restyleó a línea simple (sin caja) vía
+  `[&_input]:` en el `className` del wrapper — mismo mecanismo que ya usó `Catalog3.tsx` para su
+  buscador en píldora. A diferencia del bug de `Button.tsx` documentado arriba, este patrón **sí**
+  es seguro contra el orden de generación de Tailwind: un selector descendiente (`.wrapper input`)
+  tiene más especificidad que una clase suelta en el propio input, gana siempre, no depende de
+  qué se generó primero.
+- **`Home.tsx` — bug de contenido encontrado de paso**: el título decía "tres formas de
+  mirarlo", ya desactualizado con este cuarto catálogo (y ya le había pasado antes con el
+  tercero). Se sacó el número del título ("muchas formas de mirarlo") para que no vuelva a
+  quedar mal la próxima vez que se agregue un diseño al registro.
+
+**Quinto diseño de catálogo — `Catalog5.tsx`, el primero con página de detalle propia** (pedido
+explícito del usuario, con la skill `frontend-design` como guía activa — dos preguntas se le
+hicieron antes de implementar: estructura del carrusel y dirección del fondo, ver la respuesta
+del usuario en la conversación). Montado en `/catalog5`.
+- Identidad "vidriera de noche": el único de los 5 con fondo oscuro en toda la página (no solo
+  la navbar, como `Catalog2.tsx`) — negro carbón + acento dorado/bronce (`--color-c5-*` en
+  `index.css`, paleta propia como `Catalog4.tsx`) + tipografía Space Grotesk (`--font-catalog5`,
+  agregada al `<link>` de Google Fonts). Pedido explícito del usuario: "no quiero el blanco
+  plano de IA".
+- **Galería como carrusel horizontal** (scroll-snap nativo de CSS, sin librería) en vez de
+  grilla estática — filtro de categoría (chips) decide qué entra al carrusel, flechas
+  funcionales (`ChevronLeftIcon`/`ChevronRightIcon` de heroicons) arriba a la derecha además del
+  swipe/drag nativo. Se evaluó también un carrusel por categoría estilo Netflix — se descartó
+  porque con el catálogo real de hoy (pocas categorías, ~1 producto c/u) cada fila quedaría casi
+  vacía; un solo carrusel + filtro aprovecha mejor los datos que hay.
+- **Clickear un producto NAVEGA a una página nueva, no abre un modal** — a diferencia de los
+  otros 4 catálogos (todos reutilizan `ProductDetailModal.tsx`), acá cada card es un `<Link>` a
+  `/catalog5/detalleproducto/:id` (`DetalleProducto.tsx`, nuevo). Reutiliza `getProductService`
+  (el mismo service público que ya usaba la vieja `pages/Public/ProductDetail/ProductDetail.tsx`
+  para esto, sin endpoint nuevo) y arma su propia mini-galería de fotos (imagen grande +
+  miniaturas, mismo concepto que `ProductDetailModal` pero como layout de página completa en vez
+  de modal — no se compartió el componente porque `ProductDetailModal` está atado a
+  `Modal.tsx`/`@headlessui`; la lógica que se duplica es mínima, ~15 líneas). "← Volver al
+  catálogo" en la página de detalle vuelve puntualmente a `/catalog5`, no a la Landing.
+- **Cambio real en la arquitectura del registro, no solo una página nueva**: `CatalogDefinition`
+  (`catalog.types.ts`) ganó `hasSubRoutes?: boolean`. Necesario porque el `path` del registro se
+  usa en dos lugares con requisitos distintos — `App.tsx` arma la `<Route>` (necesita `catalog5/*`
+  para que matchee las sub-rutas) y `Home.tsx` arma el link de la card (`/${path}`, que con un `*`
+  literal quedaría roto). `App.tsx` ahora arma el path de la ruta como `` `${catalog.path}/*` ``
+  solo cuando `hasSubRoutes` es `true`; el resto de los catálogos (sin el flag) siguen exactamente
+  igual que antes. `Catalog5.tsx` en sí es un shell fino (`<Routes>` con `/` →
+  `CatalogoCarrusel.tsx` y `detalleproducto/:id` → `DetalleProducto.tsx`, + un catch-all que
+  redirige a `/catalog5`) — mismo patrón que ya usan `Admin.tsx`/`User.tsx` para su sub-ruteo,
+  aplicado por primera vez a un catálogo público.
+- El buscador se restyleó a píldora oscura vía `[&_input]:` en el wrapper (mismo mecanismo que
+  `Catalog3.tsx`/`Catalog4.tsx` — selector descendiente, no depende del orden de generación de
+  Tailwind, a diferencia del bug de `Button.tsx` documentado más arriba).
+
+**Sexto diseño de catálogo — `Catalog6.tsx`, landing densa "tienda por departamentos"** (pedido
+explícito del usuario, con la skill `frontend-design` como guía activa, a partir de un spec
+externo — análisis de la estructura/layout/funcionalidad de una landing de e-commerce retail
+multicategoría, tipo paris.cl). Montado en `/catalog6`, sin `hasSubRoutes` (usa
+`ProductDetailModal`, no página propia como `Catalog5`).
+
+**Antes de implementar se confirmaron dos cosas con el usuario** (preguntadas explícitamente,
+ver la conversación): que la landing usara **productos reales del backend** en vez del
+clon con datos 100% inventados que pedía el spec original, y un outline de archivos.
+
+- **Qué se adaptó del spec y por qué** (todo documentado también inline en `Catalog6.tsx`, acá
+  el resumen): sin "marcas hermanas" (no existen — la top bar usa links reales del sitio); sin
+  selector de "entregar en [ciudad]" (no hay delivery en el backend); **sin carrito, ni
+  siquiera simulado** (un contador que no suma nada real sería la misma clase de problema que
+  ya se evitó en los otros 5 — cada producto abre `ProductDetailModal`, como
+  `Catalog.tsx`–`Catalog4.tsx`); "Ingresá o registrate" pasó a reflejar la sesión real (link a
+  `/perfil` si hay sesión, a `/login` si no — sin "registrate", no hay alta pública); **sin
+  ofertas flash ni countdown ni % de descuento/precio tachado** — `Product` no tiene precio de
+  oferta en este proyecto, se reemplazó por una sección real "Explorá el catálogo" (carrusel +
+  filtro de categoría por `<select>`, sexta variante distinta del mismo patrón de filtro que ya
+  usan los otros 5); tiles de categoría con la imagen de un producto real de esa categoría (no
+  foto de stock); banner ancho sin "marcas participantes" inventadas (CTA real a Contacto,
+  imagen de fondo de un producto real); grid de 2 banners → 2 categorías reales con "Ver
+  categoría"; **sin banner de descarga de app** (la app Android de este proyecto — ver la
+  sección de Capacitor más arriba — no está publicada en ningún lado accesible, un QR ahí
+  prometería algo que no existe); "tendencias de búsqueda" → categorías reales como accesos
+  rápidos, sin afirmar analítica de búsquedas que no se mide; **sin footer propio** (el
+  `<Footer />` global de `App.tsx` ya cubre esto, mismo criterio que los otros 5).
+- **Qué se mantuvo del spec, funcionando de verdad**: top bar, header sticky con shrink al
+  scroll (clase de padding condicional según `window.scrollY`), drawer de categorías deslizante
+  (`CategoryDrawer.tsx`, cierra con la X, click afuera, o Escape — sin subcategorías: las
+  categorías de este proyecto son planas, no hay jerarquía que mostrar), hero carousel con
+  autoplay de 5s + pausa on-hover + flechas + dots + swipe táctil (`HeroCarousel.tsx`,
+  `transform: translateX` + `transition-transform`, sin librería), carrusel horizontal de
+  productos con scroll-snap (`ProductCarousel.tsx`, reutilizable), card de producto reutilizable
+  (`ProductCard.tsx`, pedido explícito del spec).
+- **Bug de accesibilidad real, encontrado y corregido en la revisión**: los 5 slides del hero
+  están todos en el DOM a la vez (`HeroCarousel.tsx` solo los desplaza con `translateX`, no los
+  desmonta) — sin nada más, los botones "Ver producto" de los slides que NO se ven quedaban
+  igual alcanzables con Tab y anunciados por un lector de pantalla. Se corrigió con
+  `aria-hidden`/`inert` en el slide no activo + `tabIndex={-1}` en su botón — mismo criterio que
+  ya resuelve la marquesina de `Catalog.tsx` para su copia decorativa.
+- **Bug de responsive real, encontrado probando en mobile**: el padding horizontal del contenido
+  del hero (`px-6` en mobile) dejaba el precio tapado por la flecha "anterior" (absoluta,
+  `left-3` + 40px de ancho ≈ 52px de zona ocupada). Se subió a `px-14` en mobile —
+  encontrado con una captura real de 390px de ancho, no se habría visto en desktop.
+- `getProductsService` se llama dos veces con propósitos distintos: una vez sin filtrar
+  (`allProducts`, límite 50, alimenta el hero + las miniaturas de categoría, una sola vez al
+  montar) y otra que reacciona a búsqueda/categoría (`products`, para la sección "Explorá el
+  catálogo") — separadas a propósito para que filtrar no le vuele los slides del hero ni las
+  miniaturas de categorías que no tienen ningún producto en el resultado filtrado.
+
+**Séptimo diseño de catálogo — `Catalog7.tsx`, grilla técnica densa** (pedido explícito del
+usuario, a partir de un spec externo de card de e-commerce de tecnología tipo "grilla densa con
+doble precio"). Montado en `/catalog7`, reutiliza `ProductDetailModal` (no página propia).
+
+- **El spec original pedía redecorar `Catalog3.tsx`, no crear uno nuevo** — se le marcó al
+  usuario antes de tocar nada que eso chocaba con la identidad ya aprobada de `Catalog3.tsx`
+  (paris.cl, redondeado, rosa/fucsia) y la acercaría a la de `Catalog2.tsx` (que ya es el diseño
+  técnico/denso), y que el spec pedía campos que no existen en `Product` en este proyecto
+  (marca, SKU con formato propio, precio de descuento, precio por medio de pago) y un botón de
+  carrito que este proyecto no tiene en ningún lado. El usuario confirmó: catálogo nuevo
+  (`Catalog7`), sin esos campos, sin carrito ni siquiera como placeholder. `Catalog3.tsx` no se
+  tocó.
+- **Acento índigo** (el único de los 7 que lo usa) + tipografía del sistema sin sumar una fuente
+  nueva — pedido explícito del spec original ("no importes una nueva sin avisar"), así que
+  `Catalog7` no agregó ningún token a `index.css` ni `<link>` a `index.html` (el único de los 7
+  catálogos sin tokens propios).
+- `ProductCard.tsx` (nuevo, propio de este catálogo — no compartido con los otros 6, mismo
+  criterio que ya estableció `Catalog6.tsx`: cada catálogo tiene su propia card visual, solo se
+  comparten datos/lógica) — pedido explícito del spec ("extraelo como subcomponente
+  reutilizable"). Indicador de stock con 4 estados reales: `null` → "Consultar disponibilidad"
+  (mismo criterio que los otros 6), `0` → "Sin stock", `>20` → "+20 Unid.", `<10` → número exacto
+  en naranja de alerta — el rango 10–20 que el spec no definía se resolvió mostrando el número
+  exacto en tono neutro, para no dejar un salto sin criterio.
+- `ProductCardSkeleton.tsx` (mismo archivo que `ProductCard.tsx`) — pedido explícito del spec
+  ("skeletons, no un spinner genérico"), usa `animate-pulse` nativo de Tailwind. Es el único de
+  los 7 catálogos con loading skeleton en vez de un `<p>Cargando...</p>` — se muestra mientras
+  `loading` es `true`, con la misma forma que la card real.
+- Estado vacío reutiliza `EmptyState` de `components/ui/` (el mismo del "App Shell") en vez de
+  reimplementarlo — pedido explícito del spec ("mensaje claro con ícono, no una grilla en
+  blanco"), y ya existía el componente para exactamente esto.
+- `idProducto` se muestra como "ID {idProducto}" (pedido explícito del spec, "SKU o ID si
+  existe ese campo") — es un ID real, no un SKU con formato propio inventado.
 
 ## Estado de las herramientas
 

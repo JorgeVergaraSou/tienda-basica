@@ -39,6 +39,42 @@ body {
    * directo, solo tipografía propia. */
   --font-catalog3: "Poppins", ui-sans-serif, system-ui, sans-serif;
 
+  /* cuarto diseño de catálogo (Catalog4.tsx) — "vidriera boutique": serif
+   * con carácter SOLO para títulos/nombres de producto (--font-catalog4-
+   * display), el cuerpo usa el sans del sistema (no se suma una segunda
+   * fuente nueva). Paleta propia (casi blanco + tinta + verde esmeralda,
+   * ninguno de los otros 3 catálogos usa verde) — sí necesita tokens de
+   * color, a diferencia de Catalog2/Catalog3 que reusan Tailwind directo. */
+  --font-catalog4-display: "Fraunces", ui-serif, Georgia, serif;
+  --color-c4-bg: #fcfcfb;
+  --color-c4-ink: #1a1a2e;
+  --color-c4-line: #e7e5e2;
+  --color-c4-accent: #065f46;
+
+  /* quinto diseño de catálogo (Catalog5.tsx) — "vidriera de noche": fondo
+   * oscuro con personalidad (pedido explícito del usuario: "no quiero el
+   * blanco plano de IA"), acento dorado/bronce. Es el único de los 5 con
+   * fondo general oscuro — Catalog2.tsx solo tiene la navbar oscura, el
+   * resto de la página ahí es clara. */
+  --font-catalog5: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --color-c5-bg: #15171b;
+  --color-c5-surface: #1c1e24;
+  --color-c5-ink: #f2f0ea;
+  --color-c5-accent: #d9a94e;
+
+  /* sexto diseño de catálogo (Catalog6.tsx) — landing densa multi-sección
+   * estilo "tienda por departamentos" (pedido explícito del usuario, sobre
+   * un análisis de paris.cl), con datos reales — ver Frontend/CLAUDE.md.
+   * Azul marino propio (distinto del --color-brand de Catalog.tsx, que es
+   * un azul más brillante) + blanco dominante, tipografía Manrope. */
+  --font-catalog6: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  --color-c6-primary: #14204b;
+  --color-c6-primary-dark: #0c1631;
+  --color-c6-bg: #ffffff;
+  --color-c6-surface: #f1f3f7;
+  --color-c6-ink: #1b2233;
+  --color-c6-line: #e4e7ee;
+
   /* pills de categoría en marquesina (Catalog.tsx) — la cinta tiene el
    * contenido duplicado x2 (ver el comentario ahí) y recorre la mitad de
    * su propio ancho, así el loop no se nota. */

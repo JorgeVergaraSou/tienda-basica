@@ -31,8 +31,12 @@ function Home() {
       </div>
 
       <div className="max-w-6xl mx-auto px-4 py-12 sm:py-16">
+        {/* sin el número de diseños en el título a propósito — con 2 decía
+            "tres" antes de que existiera Catalog3, y volvió a pasar con
+            Catalog4. Así no vuelve a quedar desactualizado la próxima vez
+            que se agregue uno al registro. */}
         <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight max-w-lg">
-          Un catálogo, tres formas de mirarlo
+          Un catálogo, muchas formas de mirarlo
         </h1>
         <p className="mt-3 text-slate-600 max-w-md">
           Los mismos productos, categorías y precios — cada diseño de abajo es solo una manera
