@@ -426,6 +426,68 @@ crea un scroll... según alto de pantalla"):
   `--load-storage` de Playwright — no se creó ningún usuario nuevo ni se tocó ningún dato, y el
   archivo con el token se borró al terminar de verificar.
 
+**Bug de control de acceso: `/private/*` sin `RoleGuard` propio** (portado desde `tienda-carrito`,
+la copia de este proyecto donde se encontró en una pasada de QA del carrito de compra — bug
+preexistente en este template base, heredado por toda página nueva del panel). `App.tsx` protege
+bien `/admin/*` y `/user/*` con `RoleGuard`, pero `/private/*` solo exigía estar logueado
+(`AuthGuard`, sin chequear rol) — `Private.tsx` redirigía `/` siempre a `/private/admin` **sin mirar
+el rol**, y sus rutas internas (`/private/admin/*`, `/private/user/*`) no tenían su propio
+`RoleGuard`. Resultado: un USER (o cualquier rol logueado) que navegara directo a
+`/private/admin/productos` veía el **layout** del panel ADMIN — tabs, formularios vacíos. Sin fuga
+de datos real (el backend rechaza cada request con 403, `@Auth(Role.ADMIN)`), pero sí una falla de
+control de acceso del lado del frontend.
+
+- **Arreglo**: `Private.tsx` ahora calcula la ruta de `/` según el rol activo (`rutaPorRol`, un
+  `Record<Roles, string>`) en vez de ir siempre a `PrivateRoutes.ADMIN`, y sus rutas internas
+  quedaron envueltas en el mismo `RoleGuard` que ya protegía `/admin`/`/user` a nivel de `App.tsx`.
+- `rol.guard.tsx` también se llevó el fix del segundo bug que apareció al implementar esto en
+  `tienda-carrito` (un loop real de redirecciones `/private/private/private/...`, causado por
+  `<Navigate to={PrivateRoutes.PRIVATE}>` con una ruta relativa que solo coincidía por casualidad
+  con la raíz del sitio cuando `RoleGuard` se usaba nada más que a nivel superior de `App.tsx`): la
+  `Navigate` ahora usa una ruta **absoluta** (`` `/${PrivateRoutes.PRIVATE}` ``), portado ya
+  corregido de una — acá nunca llegó a manifestarse el loop porque se aplicaron los dos cambios
+  juntos, pero el comentario que explica el porqué se dejó igual, para que quien toque este archivo
+  después entienda por qué la ruta es absoluta y no "más simple".
+- **Verificado con Playwright** en este mismo proyecto (backend/frontend en puertos alternativos —
+  3007/5174 — para no interferir con el dev server real; usuarios ADMIN y USER de prueba, dados de
+  baja al terminar): un USER forzando `/private/admin/productos` termina en `/private/user` (su
+  propia página, "Cargar producto"), sin ver el panel de Productos y sin loop de redirects; el flujo
+  normal de ADMIN no cambió. `npx tsc -b --noEmit` + `npx vite build` + `npm run lint` limpios.
+
+**Ajuste masivo de precio** (`Admin/Products/`, pedido explícito del usuario: con un catálogo de
+miles de productos, cambiar el precio de a uno por vez no escala — portado desde `tienda-carrito`,
+la copia de este proyecto que le agregó carrito de compra, donde se implementó primero; ver
+`Backend/CLAUDE.md`, misma sección, para el endpoint nuevo `PATCH /productos/precios/ajuste-masivo`).
+Componente nuevo, `BulkPriceAdjustmentModal.tsx`, abierto desde un botón "Ajuste masivo de precio" al
+lado de "+ Nuevo producto" en `ProductsListPage.tsx` (mismo patrón de modal que `UserFormModal.tsx`:
+`open`/`onClose` + reset del form al abrir vía "ajustar el estado durante el render", no un
+`useEffect`).
+
+- Un solo form cubre los dos casos que pidió el usuario ("por categoría" y "general"): un `<select>`
+  "Aplicar a" con "Todo el catálogo" primero y cada categoría después (mismo criterio "(inactiva)"
+  que ya usa `ProductFormPage.tsx` para categorías dadas de baja — pueden seguir teniendo productos
+  activos con precio para ajustar) — mismo mapeo 1:1 con `idCategoria` presente/ausente que resuelve
+  el backend con un único DTO.
+- **Preview de cuántos productos afecta la selección actual**, antes de aplicar nada: reutiliza `GET
+  /productos/admin/listado` (que ya devuelve `total`) con el mismo filtro `categoriaId` que se va a
+  mandar — no hizo falta un endpoint de preview nuevo. Se recalcula cada vez que cambia la categoría
+  elegida.
+- **Confirmación explícita con SweetAlert2** antes de aplicar, con el valor, el signo y el número
+  real de productos en el texto — a diferencia de "dar de baja" (reversible con un click), deshacer
+  un ajuste masivo significa aplicar otro a mano con el valor inverso, así que vale la pena el paso
+  extra antes de tocar potencialmente miles de filas.
+- `valor` admite negativos (baja de precio), no solo el "aumento" que pidió el usuario — mismo campo
+  y misma fórmula de los dos lados (frontend y backend), así que no costaba nada extra de código
+  soportar también la baja, y es estrictamente más útil.
+- `services/products.service.ts` ganó `bulkPriceAdjustmentService` (`PATCH
+  /productos/precios/ajuste-masivo`) y los tipos `TipoAjustePrecio`/`BulkPriceAdjustmentData`.
+- **Verificado end-to-end con Playwright** (backend/frontend levantados en puertos alternativos —
+  3007/5174 — para no interferir con el dev server real de este proyecto; login real contra un
+  usuario ADMIN de prueba creado a propósito, dado de baja al terminar): el modal muestra el conteo
+  de productos, la confirmación de SweetAlert2 aparece, el mensaje de éxito muestra la cantidad
+  afectada, y el listado de productos refleja el precio nuevo — sin errores de consola. `npx tsc -b
+  --noEmit` + `npx vite build` + `npm run lint` limpios.
+
 ## Arquitectura (esto sí hay que mantener con cuidado)
 
 ### Alias `@/`
@@ -1008,6 +1070,14 @@ doble precio"). Montado en `/catalog7`, reutiliza `ProductDetailModal` (no pági
   blanco"), y ya existía el componente para exactamente esto.
 - `idProducto` se muestra como "ID {idProducto}" (pedido explícito del spec, "SKU o ID si
   existe ese campo") — es un ID real, no un SKU con formato propio inventado.
+
+**CSP y endurecimiento (auditoría de seguridad 2026-09-30)**: 0 usos de `dangerouslySetInnerHTML`/
+`innerHTML`/`eval`; SweetAlert2 interpreta `title`/`html`/`footer` como HTML — si algún día se interpola un
+dato ahí hay que escaparlo. `vite.config.ts` inyecta una Content-Security-Policy (`<meta>`) en el build web
+(no en `vite dev` ni en `--mode mobile`); `connect-src`/`img-src` salen de `VITE_API_BASE_URL`. En
+producción agregar `frame-ancestors 'none'` y `X-Frame-Options` como cabeceras del servidor que sirva
+`dist/`. `api/axios.ts`: `JSON.parse` de la sesión con `try/catch`; `window.open` a WhatsApp con
+`noopener,noreferrer`. Pendiente (baja): el token vive en `localStorage`.
 
 ## Estado de las herramientas
 

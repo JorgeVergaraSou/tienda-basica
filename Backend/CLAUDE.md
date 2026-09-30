@@ -252,6 +252,68 @@ clientes tienen que poder mandarle un mensaje al negocio). Un solo módulo cubre
 - Logger propio (`contactErrorLogger`, `module-loggers.ts`), mismo patrón que el resto de los
   módulos.
 
+**Ajuste masivo de precio** (`ProductsModule`, pedido explícito del usuario: editar el precio de a
+un producto por vez no escala con un catálogo de miles — "aumento masivo por categoría" y "masivo
+general" son los dos casos que pidió; portado desde `tienda-carrito`, la copia de este proyecto que
+le agregó carrito de compra, donde se implementó primero). Un único endpoint (`PATCH
+/productos/precios/ajuste-masivo`, `@Auth(Role.ADMIN)` exclusivo — a diferencia del resto de las
+mutaciones de `ProductsController`, acá no hay noción de "propios", puede tocar el catálogo entero
+de un saque, así que ni siquiera deja pasar a `USER`) cubre los dos casos con el mismo
+`BulkPriceAdjustmentDto` en vez de duplicar la lógica: `idCategoria` presente = "por categoría",
+ausente/`null` = "general, todo el catálogo". Declarado ANTES de `PATCH :id` en el controller —
+mismo motivo que `admin/listado` antes de `admin/:id`: si se invirtiera el orden, Nest intentaría
+matchear `precios` como si fuera el `:id`.
+
+- `TipoAjustePrecio` (`common/enums/`, nuevo): `PORCENTAJE` | `FIJO`. `valor` es el mismo campo
+  numérico para los dos tipos y para aumento/descuento — positivo aumenta, negativo baja, así que no
+  hace falta un campo booleano "aumentar"/"bajar" aparte. Para `PORCENTAJE` hay un piso de validación
+  a nivel DTO (`@Min(-100)`, con `@ValidateIf` para que no aplique a `FIJO`, que no tiene ese límite
+  natural).
+- **`ProductsService.ajustarPreciosMasivo`**: un único `UPDATE` con una expresión SQL
+  (`createQueryBuilder().update(ProductEntity).set({ precio: () => 'GREATEST(ROUND(precio * (1 +
+  :valor / 100), 2), 0)' })`, o el equivalente con `+` para `FIJO`) en vez de un `find()` + loop de N
+  `save()` — con miles de productos, MySQL resuelve la fórmula para todas las filas que matcheen en
+  una sola pasada, mucho más rápido que traer todo a memoria. `GREATEST(...,0)` es el piso de
+  seguridad: ningún ajuste puede dejar un precio negativo, sin tener que leer cada precio de
+  antemano para validarlo en JS. `:valor` viaja como parámetro real de TypeORM (`.setParameter`),
+  nunca interpolado a mano en el string SQL.
+- **Afecta productos dados de baja también, a propósito**: un `UPDATE` de TypeORM no filtra
+  soft-delete automáticamente (a diferencia de `find`/`findOne`), y acá se dejó así deliberadamente
+  — un producto pausado conserva el precio ajustado para cuando se reactive, en vez de quedar
+  desactualizado. Si `idCategoria` viene, se valida contra `CategoriesService.findActivaByIdOrThrow`
+  antes de tocar nada (mismo criterio que `resolverCategoria`) — sin este chequeo, un id inexistente
+  no rompería nada (el `WHERE` no matchearía ninguna fila), pero el ADMIN recibiría "0 productos
+  afectados" sin saber si la categoría está vacía o el id está mal.
+- `BulkPriceAdjustmentResponseDto` solo devuelve `productosAfectados` (un conteo, no la lista — con
+  miles de filas no tendría sentido devolver cada producto actualizado).
+- **Verificado contra la base real** (no mockeado): +10% a la categoría "Pelotas" (2 productos,
+  $10000→$11000 y $12333→$13566.30), categoría inexistente → 400. El frontend (panel ADMIN) muestra
+  un preview de cuántos productos afecta la selección antes de aplicar — ver `Frontend/CLAUDE.md`.
+
+**Auditoría de seguridad completa según `guia-seguridad-proyectos.md` (2026-09-30, portada desde
+`tienda-carrito`)**: ataques como tests automáticos en `test/security/` (191 tests,
+`npm run test:security`; necesita `Backend/.env.e2e`, ignorado por Git, con las credenciales de la base
+`tienda_e2e` y el usuario `tb_e2e` que solo ve esa base — el arnés aborta si `DB_NAME` no termina en
+`_e2e`, simula mails y trabaja en un directorio temporal). `src/app.setup.ts` (`configureApp`) es la
+configuración de servidor compartida entre `main.ts` y los tests. El detalle completo de cada falla y
+su corrección está en `tienda-carrito/Backend/CLAUDE.md` ("Auditoría de seguridad completa"); acá se
+aplicó lo que corresponde a este proyecto (no tiene pedidos ni Mercado Pago):
+- Recuperación de clave: el enlace solo va al email ya registrado y coincidente (antes, a un usuario sin
+  email se le asociaba el de quien lo pedía = robo de cuenta); el token ya no se loguea ni viaja por
+  relaciones (`select:false`).
+- Sesiones: `AuthGuard` toma el rol de la base en cada pedido; cambiar la clave invalida los tokens
+  anteriores (`users.password_changed_at` + claim `pv`); login limitado por IP+usuario; hash ficticio;
+  un ADMIN no puede darse de baja a sí mismo.
+- Validación: `RecortarTexto`/`SinHtml`/`SinSaltosDeLinea`, `@MaxLength` = columna, topes de precio/stock/
+  `page`, `BulkPriceAdjustmentDto` (su `@ValidateIf` saltaba toda la validación de `valor` con tipo FIJO),
+  ajuste masivo con techo `LEAST(..., PRECIO_MAX)`, `escapeLikeWildcards` en el buscador de productos.
+- Errores: filtro global respeta 4xx de Express (413/400); `handleServiceError` no devuelve texto SQL.
+- Archivos: `ImagenSubidaInterceptor` (firma de bytes + borra huérfanos). CORS sin `*` por defecto
+  (cae a `FRONTEND_URL`); `TRUST_PROXY`. `npm audit --omit=dev` en 0 (multer, nodemailer 10.0.13).
+- **Pendiente (no aplicado)**: la app se conecta como `root` de MySQL (clave corta); con `synchronize: true`
+  necesita DDL, así que el usuario correcto es uno con `ALL PRIVILEGES` solo sobre `tienda.*`. La columna
+  `users.password_changed_at` se crea sola al primer arranque con el código nuevo.
+
 **Identidad de login**: `nickUsuario`, no `email`, es el identificador de login — el email es
 opcional y solo queda asociado a una cuenta la primera vez que se pide recuperar la contraseña
 para esa cuenta (ver `AuthService.requestResetPassword`); una vez seteado, el flujo de reset ya no

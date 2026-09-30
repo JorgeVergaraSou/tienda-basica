@@ -20,11 +20,13 @@ import {
   productImageFileFilter,
   productImageStorage,
 } from '@/common/upload/product-image-upload.config';
+import { ImagenSubidaInterceptor } from '@/common/upload/imagen-subida.interceptor';
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { FindProductsQueryDto } from './dto/find-products-query.dto';
 import { UpdateStockVisibilityDto } from './dto/update-stock-visibility.dto';
+import { BulkPriceAdjustmentDto } from './dto/bulk-price-adjustment.dto';
 
 @Controller('productos')
 export class ProductsController {
@@ -87,6 +89,20 @@ export class ProductsController {
     return this.productsService.crearProducto(dto, user);
   }
 
+  /** ajuste masivo de precio (por categoría, o general a todo el
+   * catálogo — ver BulkPriceAdjustmentDto). ADMIN-only, a diferencia del
+   * resto de las mutaciones de este controller que también dejan pasar a
+   * USER para sus propios productos: acá no hay "propios", puede tocar
+   * el catálogo entero de un saque. Declarado ANTES de PATCH ':id' —
+   * mismo motivo que 'admin/listado' antes de 'admin/:id' más arriba: si
+   * se invirtiera el orden, Nest intentaría matchear "precios" como si
+   * fuera el :id de la ruta de abajo. */
+  @Auth(Role.ADMIN)
+  @Patch('precios/ajuste-masivo')
+  async ajusteMasivoPrecio(@Body() dto: BulkPriceAdjustmentDto) {
+    return this.productsService.ajustarPreciosMasivo(dto);
+  }
+
   @Auth(Role.ADMIN)
   @Patch(':id')
   async update(
@@ -108,6 +124,9 @@ export class ProductsController {
       fileFilter: productImageFileFilter,
       limits: { fileSize: 5 * 1024 * 1024 },
     }),
+    // verifica la firma real del archivo y borra el archivo si el pedido
+    // falla después de guardarse (ver imagen-subida.interceptor.ts)
+    ImagenSubidaInterceptor,
   )
   async actualizarImagen(
     @Param('id', ParseIntPipe) id: number,
@@ -129,6 +148,9 @@ export class ProductsController {
       fileFilter: productImageFileFilter,
       limits: { fileSize: 5 * 1024 * 1024 },
     }),
+    // verifica la firma real del archivo y borra el archivo si el pedido
+    // falla después de guardarse (ver imagen-subida.interceptor.ts)
+    ImagenSubidaInterceptor,
   )
   async agregarFoto(
     @Param('id', ParseIntPipe) id: number,
